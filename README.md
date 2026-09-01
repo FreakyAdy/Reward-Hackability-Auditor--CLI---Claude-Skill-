@@ -6,7 +6,7 @@
 **Fuzz your verifier before an RL agent does.**
 
 [![CI / Quality Gate](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/actions/workflows/audit.yml/badge.svg)](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/actions)
-[![Tests Passing](https://img.shields.io/badge/tests-91%2F91%20passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests Passing](https://img.shields.io/badge/tests-96%2F96%20passed%20(100%25)-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)

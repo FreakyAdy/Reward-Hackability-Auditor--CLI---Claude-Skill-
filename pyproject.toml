@@ -21,6 +21,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Security",
 ]
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-"
@@ -28,11 +33,6 @@ Repository = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Cla
 Documentation = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/tree/main/docs"
 Changelog = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/blob/main/CHANGELOG.md"
 Tracker = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/issues"
-dependencies = [
-    "click>=8.0",
-    "rich>=13.0",
-    "pyyaml>=6.0",
-]
 
 [project.optional-dependencies]
 ollama = ["ollama>=0.4"]
