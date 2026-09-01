@@ -15,9 +15,10 @@
 [![Agent Skills](https://img.shields.io/badge/AgentSkills.io-Verified%20Skill-0052FF.svg)](https://agentskills.io)
 
 <p align="center">
+  <a href="PAPER.md"><b>📄 Read Technical Report (112 Envs Scanned)</b></a> •
   <a href="#-quick-demo">Quick Demo</a> •
   <a href="#-why-ratctl">Why ratctl</a> •
-  <a href="#-initial-validation-suite">Initial Validation Suite</a> •
+  <a href="#-empirical-security-audit-112-environments-scanned">112 Envs Audit</a> •
   <a href="#-system-architecture">Architecture</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-github-action--ci-gate">CI Gate</a> •
@@ -110,7 +111,7 @@ Recent research highlights how common this is:
 
 We conducted an empirical security audit using `ratctl` across a diverse dataset of **112 RL post-training environments** (spanning OpenEnv Hub tasks, Prime Intellect `verifiers` spec environments, Gymnasium wrappers, and SWE-bench tasks).
 
-See the full generated report in [`AUDIT_REPORT.md`](file:///c:/Work/Projects/Reward-Hackability%20Auditor%20%28CLI%20+%20Claude%20Skill%29/AUDIT_REPORT.md).
+See the standalone technical paper in [`PAPER.md`](file:///c:/Work/Projects/Reward-Hackability%20Auditor%20%28CLI%20+%20Claude%20Skill%29/PAPER.md) and full dataset findings in [`AUDIT_REPORT.md`](file:///c:/Work/Projects/Reward-Hackability%20Auditor%20%28CLI%20+%20Claude%20Skill%29/AUDIT_REPORT.md).
 
 ```bash
 $ python scripts/generate_real_world_audit.py
