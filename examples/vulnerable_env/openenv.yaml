@@ -1,0 +1,3 @@
+name: vulnerable-math-environment
+description: Deliberately gameable OpenEnv verifier demonstrating reward hacking
+version: 1.0.0

@@ -1,6 +1,6 @@
 [project]
 name = "ratctl"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reward Audit Tool — fuzz your verifier before an RL agent does."
 readme = "README.md"
 license = {text = "MIT"}
@@ -8,9 +8,9 @@ requires-python = ">=3.10"
 authors = [
     {name = "FreakyAdy"},
 ]
-keywords = ["reinforcement-learning", "reward-hacking", "verifier", "audit", "openenv", "rl-safety"]
+keywords = ["reinforcement-learning", "reward-hacking", "verifier", "audit", "openenv", "rl-safety", "fuzzing", "ai-safety"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -21,6 +21,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Security",
 ]
+
+[project.urls]
+Homepage = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-"
+Repository = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-"
+Documentation = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/tree/main/docs"
+Changelog = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/blob/main/CHANGELOG.md"
+Tracker = "https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/issues"
 dependencies = [
     "click>=8.0",
     "rich>=13.0",

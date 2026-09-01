@@ -4,6 +4,7 @@ from click.testing import CliRunner
 
 import pytest
 
+from ratctl import __version__
 from ratctl.cli import main
 
 
@@ -71,4 +72,4 @@ class TestVersionFlag:
     def test_version(self, runner):
         result = runner.invoke(main, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.output
+        assert __version__ in result.output

@@ -10,19 +10,19 @@
 [![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
-[![OpenEnv Ready](https://img.shields.io/badge/OpenEnv-Compatible-purple.svg)](https://github.com/openenv-org/openenv)
-[![Prime Intellect Verifiers](https://img.shields.io/badge/verifiers--spec-Compatible-orange.svg)](https://github.com/primeintellect-ai/verifiers)
-[![Agent Skills](https://img.shields.io/badge/AgentSkills.io-Verified%20Skill-0052FF.svg)](https://agentskills.io)
+[![Contributing Guide](https://img.shields.io/badge/contributing-guide-blue.svg)](CONTRIBUTING.md)
+[![Changelog](https://img.shields.io/badge/changelog-v0.2.0-brightgreen.svg)](CHANGELOG.md)
+[![Live Monitoring](https://img.shields.io/badge/ratctl--watch-beta-purple.svg)](#-live-in-training-monitoring-ratctl-watch)
 
 <p align="center">
   <a href="PAPER.md"><b>📄 Read Technical Report (112 Envs Scanned)</b></a> •
   <a href="#-quick-demo">Quick Demo</a> •
   <a href="#-why-ratctl">Why ratctl</a> •
+  <a href="#-live-in-training-monitoring-ratctl-watch">Live Monitoring</a> •
   <a href="#-empirical-security-audit-112-environments-scanned">112 Envs Audit</a> •
   <a href="#-system-architecture">Architecture</a> •
   <a href="#-quick-start">Quick Start</a> •
-  <a href="#-github-action--ci-gate">CI Gate</a> •
-  <a href="#-contributing--community">Contributing</a>
+  <a href="#-related-tools--ecosystem">Related Tools</a>
 </p>
 
 </div>
@@ -241,8 +241,56 @@ ratctl audit ./my_environment --dynamic --frontier --samples 10
 # 5. Output structured JSON for security telemetry
 ratctl audit ./my_environment --format json -o audit-report.json
 
-# 6. Re-render a saved JSON audit report
-ratctl report audit-report.json
+### Runnable Examples
+
+Explore the [`examples/`](examples/) directory to test `ratctl` against clean vs. vulnerable environments back-to-back:
+
+```bash
+# 1. Audit clean hardened environment (0 findings)
+ratctl audit ./examples/hardened_env
+
+# 2. Audit vulnerable environment (flags 4 CRITICAL findings)
+ratctl audit ./examples/vulnerable_env --fail-on 'gameability>0.3'
+```
+
+---
+
+## 📡 Live In-Training Monitoring (`ratctl watch`) *(Beta)*
+
+While `ratctl audit` secures verifiers **pre-deployment**, `ratctl watch` monitors verifiers **in-training** during RL policy optimization (GRPO, PPO, TRL).
+
+### Drop-in Python Decorator
+
+```python
+import ratctl
+
+@ratctl.watch
+def verify_solution(completion, ground_truth):
+    return 1.0 if completion.strip() == ground_truth.strip() else 0.0
+```
+
+### TRL / GRPO Integrations (`GRPOSpy`)
+
+```python
+from ratctl.integrations import GRPOSpy
+from trl import GRPOTrainer
+
+spy = GRPOSpy(reward_funcs=[accuracy_reward, format_reward])
+trainer = GRPOTrainer(
+    model=model,
+    reward_funcs=spy.wrapped_reward_funcs,
+    ...
+)
+```
+
+### CLI Trajectory Inspection
+
+```bash
+# 1. Stream live verifier trajectory logs
+ratctl show logs/run.jsonl
+
+# 2. Display aggregate ceiling & anomaly statistics
+ratctl summary logs/run.jsonl
 ```
 
 ---
@@ -270,82 +318,54 @@ jobs:
           format: "text"
 ```
 
-The action populates `$GITHUB_STEP_SUMMARY` with Markdown breakdown tables and sets action outputs (`gameability-score`, `total-findings`, `passed`, `format-detected`).
+### Sample `$GITHUB_STEP_SUMMARY` Output
 
----
+When triggered in GitHub Actions, `ratctl` renders rich Markdown summaries directly into the Action job log:
 
-## 🤖 Claude / Agent Skill (`SKILL.md`)
+```text
+### 🐀 RATCTL AUDIT SUMMARY
+* **Status**: 🔴 FAILED (Gameability Score: 85/100)
+* **Format Detected**: `openenv` (99% confidence)
+* **Total Findings**: 4 (3 Critical, 1 High)
 
-`ratctl` is packaged as a spec-compliant skill for **Claude Code**, **Cursor**, **Codex**, and **Gemini CLI** via [agentskills.io](https://agentskills.io):
-
-```bash
-npx skills add FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-
+| Exploit Class | Severity | Finding | Location |
+| :--- | :---: | :--- | :--- |
+| `TEST_TAMPERING` | 🔴 Critical | Deleting test file | `server/app.py:18` |
+| `GRADER_MANIPULATION` | 🔴 Critical | Stack frame introspection | `server/environment.py:42` |
+| `PREMATURE_TERMINATION` | 🔴 Critical | `sys.exit(0)` early exit | `verifier.py:28` |
+| `ENV_HIJACKING` | 🟠 High | Git history leak | `verifier.py:65` |
 ```
 
 ---
 
-## 🌐 Supported Frameworks
+## ⚖️ Related Tools & Ecosystem
 
-* **OpenEnv**: Auto-detects `openenv.yaml`, `server/app.py`, `models.py` (Pydantic Action/Observation schemas), and `client.py`.
-* **Prime Intellect `verifiers`**: Detects `load_environment()`, `@vf.stop` decorators, `MultiTurnEnv` / `ToolEnv` / `SingleTurnEnv` hierarchies, and rubrics.
-* **Gymnasium**: Detects `step()`, `reset()`, and reward assignment syntax.
-* **Raw Python**: Zero-config fallback for custom scripts.
+`ratctl` complements existing tools in the RL safety and monitoring ecosystem:
+
+| Tool | Primary Focus | Lifecycle Stage | Detection Scope | CI Gate |
+| :--- | :--- | :---: | :--- | :---: |
+| **`ratctl`** | **Verifier Security & Gameability Audit** | **Pre-Deployment & In-Training** | **AST logic vulnerabilities, red-team fuzzing, verifier call trajectories** | ✅ Yes |
+| **`rewardspy`** | Live Reward Curve Tracking | In-Training | Reward mean/std, component weight drift, ceiling hits | ❌ No |
+| **`PyTest`** | Unit Testing | Development | Code unit correctness | ⚠️ Manual |
+
+> *`ratctl` and `rewardspy` address complementary lifecycle stages: use `ratctl audit` pre-deployment to fix verifier security bugs, and `ratctl watch` or `rewardspy` in-training to track reward dynamics.*
 
 ---
 
 ## 🤝 Contributing & Community
 
-`ratctl` is an open-source community effort. Here is how you can get involved:
+`ratctl` is an open-source community effort. We welcome custom detectors, bug reports, and research extensions!
 
-### ⭐ 1. Star the Project
-If you find `ratctl` useful, please give the repo a star — it helps increase visibility in the RL safety and OpenEnv communities!
-
-### 💡 2. Write a Custom Detector
-Adding a new static detector takes under 20 lines of Python. Here is a simple example:
-
-```python
-# ratctl/detectors/my_custom_detector.py
-import re
-from ratctl.detectors.base import BaseDetector, DetectorResult, ExploitClass, Finding, Severity, SourceFile
-
-class MyCustomDetector(BaseDetector):
-    @property
-    def name(self) -> str:
-        return "my_custom_detector"
-
-    @property
-    def exploit_class(self) -> ExploitClass:
-        return ExploitClass.GRADER_MANIPULATION
-
-    def scan(self, source_files: list[SourceFile]) -> DetectorResult:
-        result = DetectorResult(detector_name=self.name, exploit_class=self.exploit_class)
-        pattern = re.compile(r"evil_pattern_here")
-        for src in source_files:
-            for line_no, line in enumerate(src.content.splitlines(), 1):
-                if pattern.search(line):
-                    result.findings.append(self._make_finding(
-                        file_path=src.path, line_number=line_no,
-                        title="Custom Exploit Detected", description="Found custom vulnerability",
-                        evidence=line.strip(), suggested_fix="Fix it by...",
-                        severity=Severity.HIGH
-                    ))
-        return result
-```
-
-### 🐛 3. Report a Vulnerability Pattern or Bug
-Have you seen an RL agent exploit a verifier pattern that `ratctl` missed? [Open an issue](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/issues) or submit a reproduction snippet!
-
----
-
-## 🗺️ Roadmap & Ongoing Audits
-
-- [x] **Phase 1-3**: Core static analyzer, dynamic LLM fuzzer, OpenEnv & `verifiers` adapters
-- [x] **Phase 4-5**: GitHub Action, Claude Skill, 10-environment initial validation suite
-- [ ] **Large-Scale Open-Source Audit**: Run `ratctl` across 100+ public OpenEnv & Prime Intellect repositories to publish an empirical report on common real-world verifier vulnerabilities.
-- [ ] **AST Call-Graph Tracing**: Deeper taint analysis tracking how agent inputs flow into verifier assertion statements.
+* **[CONTRIBUTING.md](CONTRIBUTING.md)**: Setup guide, custom detector tutorial, and PR guidelines.
+* **[CHANGELOG.md](CHANGELOG.md)**: Version history and feature updates.
+* **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)**: Community health standards.
+* **[docs/detectors.md](docs/detectors.md)**: Mathematical specifications of the detection engine.
+* **[docs/hack_patterns.md](docs/hack_patterns.md)**: Code gallery of exploit patterns with before/after fixes.
 
 ---
 
 ## 📄 License
+
+MIT License — see [`LICENSE`](LICENSE) for details.
 
 Distributed under the **[MIT License](LICENSE)**.

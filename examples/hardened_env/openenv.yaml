@@ -1,0 +1,3 @@
+name: hardened-math-environment
+description: Hardened OpenEnv verifier reference implementation
+version: 1.0.0

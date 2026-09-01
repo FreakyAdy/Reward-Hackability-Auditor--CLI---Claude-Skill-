@@ -247,6 +247,47 @@ def benchmark(path: str, output_format: str, threshold: float, output: str | Non
         click.echo(report_text)
 
 
+@main.command()
+@click.argument("log_path", type=click.Path(exists=True), default="logs/run.jsonl")
+@click.option("--follow", "-f", is_flag=True, help="Follow log output in real time.")
+def show(log_path: str, follow: bool):
+    """Inspect live runtime verifier trajectory logs (JSONL)."""
+    from ratctl.watch import read_logs
+
+    events = read_logs(log_path)
+    if not events:
+        click.echo(f"No logged verifier events found in {log_path}")
+        return
+
+    click.echo(f"=== RATCTL RUNTIME TRAJECTORY LOGS ({len(events)} events) ===")
+    for e in events:
+        status = "[PASS]" if e.get("passed") else "[FAIL]"
+        reward = e.get("reward", 0.0)
+        ms = e.get("duration_ms", 0.0)
+        verifier = e.get("verifier_name", "verifier")
+        click.echo(f"Step {e.get('step'):<4} | {status} reward={reward:<5.2f} | {ms:<6.1f}ms | {verifier}")
+
+
+@main.command()
+@click.argument("log_path", type=click.Path(exists=True), default="logs/run.jsonl")
+def summary(log_path: str):
+    """Display aggregate statistics over runtime verifier JSONL logs."""
+    from ratctl.watch import summarize_logs
+
+    stats = summarize_logs(log_path)
+    click.echo("=== RATCTL RUNTIME TRAJECTORY SUMMARY ===")
+    click.echo(f"Total Verifier Calls : {stats['total_calls']}")
+    click.echo(f"Pass Rate            : {stats['pass_rate']:.1%}")
+    click.echo(f"Mean Reward          : {stats['mean_reward']:.3f}")
+    click.echo(f"Ceiling Rate (>=1.0) : {stats['ceiling_rate']:.1%}")
+    click.echo(f"Exceptions Caught    : {stats['exception_count']}")
+    click.echo(f"Avg Latency          : {stats['avg_duration_ms']} ms")
+
+    if stats.get("warning_flag"):
+        click.echo("\n⚠️  WARNING: >85% of rollout steps hit max reward ceiling! Possible reward shortcut.", err=True)
+
+
+
 def _parse_threshold(fail_on: str) -> float | None:
     """Parse a --fail-on expression like 'gameability>0.3'."""
     match = re.match(r"gameability\s*>\s*([0-9]*\.?[0-9]+)", fail_on)
