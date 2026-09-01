@@ -28,7 +28,7 @@
 <br>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="ratctl audit live terminal demo" width="100%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);">
+  <img src="docs/tui_demo.gif" alt="ratctl TUI — real-time reward hacking detection" width="100%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);">
 </p>
 
 </div>
