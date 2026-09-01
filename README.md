@@ -8,6 +8,7 @@
 [![CI / Quality Gate](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/actions/workflows/audit.yml/badge.svg)](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/actions)
 [![Tests Passing](https://img.shields.io/badge/tests-96%2F96%20passed%20(100%25)-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](tests/)
+[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space%20Demo-yellow.svg)](docs/huggingface.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![Contributing Guide](https://img.shields.io/badge/contributing-guide-blue.svg)](CONTRIBUTING.md)
@@ -18,11 +19,11 @@
   <a href="PAPER.md"><b>📄 Read Technical Report (112 Envs Scanned)</b></a> •
   <a href="#-quick-demo">Quick Demo</a> •
   <a href="#-why-ratctl">Why ratctl</a> •
+  <a href="docs/huggingface.md">🤗 Hugging Face Space</a> •
   <a href="#-live-in-training-monitoring-ratctl-watch">Live Monitoring</a> •
   <a href="#-empirical-security-audit-112-environments-scanned">112 Envs Audit</a> •
   <a href="#-system-architecture">Architecture</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-related-tools--ecosystem">Related Tools</a>
+  <a href="#-quick-start">Quick Start</a>
 </p>
 
 <br>
