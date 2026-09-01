@@ -32,6 +32,8 @@
   <img src="docs/demo.gif" alt="ratctl catching a reward hack — CRITICAL findings firing, FAIL exit" width="100%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);">
 </p>
 
+> **🤗 Hugging Face Live Demo** — The [live demo](https://huggingface.co/spaces/adityss/ratctl-verifier-auditor) is a browser-based JavaScript port of ratctl's regex detection engine (covering all 6 exploit classes). For full AST-based analysis, multi-file directory scanning, format auto-detection, and dynamic LLM fuzzing, install the CLI: `pip install ratctl`.
+
 </div>
 
 ---

@@ -14,7 +14,7 @@ import tempfile
 import gradio as gr
 
 # Ensure local ratctl package is importable
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from ratctl.analyzer import audit
 from ratctl.ui.dashboard import generate_dashboard_html
@@ -150,13 +150,14 @@ def audit_code_snippet(code: str, env_format: str = "raw") -> tuple[str, str, st
         )
 
 
-def build_app() -> gr.Blocks:
-    custom_css = """
-    .gradio-container { max-width: 1300px !important; margin: auto !important; }
-    #header-box { text-align: center; margin-bottom: 20px; }
-    """
+CUSTOM_CSS = """
+.gradio-container { max-width: 1300px !important; margin: auto !important; }
+#header-box { text-align: center; margin-bottom: 20px; }
+"""
 
-    with gr.Blocks(title="ratctl — Reward-Hackability Auditor", css=custom_css, theme=gr.themes.Soft()) as demo:
+
+def build_app() -> gr.Blocks:
+    with gr.Blocks(title="ratctl — Reward-Hackability Auditor") as demo:
         with gr.Column(elem_id="header-box"):
             gr.Markdown(
                 """
@@ -236,4 +237,4 @@ def build_app() -> gr.Blocks:
 
 if __name__ == "__main__":
     app = build_app()
-    app.launch()
+    app.launch(css=CUSTOM_CSS, theme=gr.themes.Soft())

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ratctl — Reward-Hackability Auditor for RL Verifiers</title>
+  <meta name="description" content="Audit RL environment verifiers, reward functions, and grading harnesses for reward-hacking vulnerabilities.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: rgba(18, 26, 44, 0.75);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --accent-red: #ff4757;
+      --accent-orange: #ffa502;
+      --accent-green: #2ed573;
+      --accent-blue: #3742fa;
+      --accent-cyan: #00d2d3;
+      --accent-purple: #a55eea;
+      --text-main: #f1f2f6;
+      --text-muted: #a4b0be;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(55, 66, 250, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(255, 71, 87, 0.12) 0%, transparent 40%);
+    }
+
+    header {
+      padding: 14px 32px;
+      border-bottom: 1px solid var(--border-card);
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo-group { display: flex; align-items: center; gap: 12px; }
+    .logo-icon { font-size: 26px; }
+    .logo-title {
+      font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 0%, #a4b0be 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-badge {
+      background: rgba(0, 210, 211, 0.15); color: var(--accent-cyan);
+      border: 1px solid rgba(0, 210, 211, 0.3);
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .header-links { display: flex; gap: 12px; align-items: center; }
+    .header-links a {
+      color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .header-links a:hover { color: var(--accent-cyan); }
+
+    .app-container {
+      max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px 20px;
+      display: grid; grid-template-columns: 420px 1fr; gap: 24px;
+      min-height: calc(100vh - 60px);
+    }
+
+    @media (max-width: 900px) {
+      .app-container { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border-card);
+      border-radius: 16px; padding: 22px; backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .card:hover { border-color: rgba(255, 255, 255, 0.15); }
+
+    .input-panel { display: flex; flex-direction: column; gap: 16px; }
+    .input-panel h2 {
+      font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    }
+
+    .example-select {
+      width: 100%; padding: 10px 14px; border-radius: 10px;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border-card);
+      color: var(--text-main); font-size: 13px; font-family: 'Inter', sans-serif;
+      cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a4b0be' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .example-select:focus { outline: none; border-color: var(--accent-cyan); }
+    .example-select option { background: #1a1f36; color: var(--text-main); }
+
+    .code-editor-wrapper {
+      position: relative; border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--border-card);
+    }
+    .code-editor-header {
+      background: rgba(0,0,0,0.3); padding: 8px 14px; font-size: 11px;
+      color: var(--text-muted); display: flex; justify-content: space-between;
+      align-items: center; border-bottom: 1px solid var(--border-card);
+    }
+    .code-editor-dots { display: flex; gap: 6px; }
+    .code-editor-dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+
+    #code-input {
+      width: 100%; height: 280px; padding: 14px; border: none;
+      background: rgba(0, 0, 0, 0.3); color: #e1e8f0;
+      font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+      line-height: 1.6; resize: vertical; tab-size: 4;
+    }
+    #code-input:focus { outline: none; }
+
+    .audit-btn {
+      width: 100%; padding: 14px 24px; border: none; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      color: white; font-family: 'Inter', sans-serif; font-size: 15px;
+      font-weight: 700; cursor: pointer; letter-spacing: 0.5px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(55, 66, 250, 0.3);
+    }
+    .audit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(55, 66, 250, 0.45); }
+    .audit-btn:active { transform: translateY(0); }
+
+    .info-footer {
+      font-size: 11px; color: var(--text-muted); line-height: 1.6;
+      border-top: 1px solid var(--border-card); padding-top: 14px;
+    }
+    .info-footer a { color: var(--accent-cyan); text-decoration: none; }
+
+    .results-panel { display: flex; flex-direction: column; gap: 20px; }
+
+    .score-row { display: grid; grid-template-columns: 200px 1fr; gap: 20px; }
+    @media (max-width: 700px) { .score-row { grid-template-columns: 1fr; } }
+
+    .score-box { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .score-circle {
+      width: 130px; height: 130px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px; font-weight: 800; margin: 12px 0;
+      position: relative;
+      background: radial-gradient(circle, rgba(18, 26, 44, 0.9) 60%, transparent 100%);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    }
+    .score-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .verdict-badge {
+      display: inline-block; padding: 5px 14px; border-radius: 30px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .verdict-pass { background: rgba(46, 213, 115, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .verdict-fail { background: rgba(255, 71, 87, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat-tile {
+      background: rgba(255,255,255,0.03); border-radius: 10px; padding: 14px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .stat-val { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .stat-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .findings-section h3 {
+      font-size: 16px; font-weight: 700; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .finding-card {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 16px; margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+    .finding-card:hover { border-color: rgba(255,255,255,0.15); }
+
+    .finding-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 8px; gap: 12px;
+    }
+    .finding-title { font-size: 14px; font-weight: 600; }
+    .finding-meta { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .sev-badge {
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .sev-critical { background: rgba(255,71,87,0.2); color: var(--accent-red); }
+    .sev-high { background: rgba(255,165,2,0.2); color: var(--accent-orange); }
+    .sev-medium { background: rgba(0,210,211,0.2); color: var(--accent-cyan); }
+    .sev-low { background: rgba(46,213,115,0.15); color: var(--accent-green); }
+    .sev-info { background: rgba(164,176,190,0.15); color: var(--text-muted); }
+
+    .class-badge {
+      font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+      background: rgba(165,94,234,0.15); color: var(--accent-purple);
+    }
+
+    .finding-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px; }
+    .finding-evidence {
+      font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+      background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 8px;
+      color: var(--accent-orange); margin-bottom: 8px; overflow-x: auto;
+    }
+    .finding-fix { font-size: 12px; color: var(--accent-green); }
+    .finding-fix strong { color: var(--accent-green); }
+    .line-ref { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+    .no-findings {
+      text-align: center; padding: 40px; color: var(--accent-green);
+      font-size: 15px; font-weight: 600;
+    }
+
+    .class-section { margin-bottom: 18px; }
+    .class-section-header {
+      font-size: 13px; font-weight: 700; margin-bottom: 10px;
+      padding: 8px 14px; border-radius: 8px;
+      background: rgba(255,255,255,0.03); border-left: 3px solid var(--accent-purple);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .class-count { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text-main); }
+    .empty-state p { font-size: 13px; line-height: 1.6; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.35s ease-out; }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(255, 71, 87, 0.3); }
+      50% { box-shadow: 0 0 40px rgba(255, 71, 87, 0.6); }
+    }
+    .pulse { animation: pulse-glow 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-group">
+    <span class="logo-icon">🐀</span>
+    <span class="logo-title">ratctl</span>
+    <span class="header-badge">v0.1.0</span>
+  </div>
+  <div class="header-links">
+    <a href="https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-" target="_blank">📦 GitHub</a>
+    <a href="https://pypi.org/project/ratctl/" target="_blank">📄 PyPI</a>
+  </div>
+</header>
+
+<div class="app-container">
+  <div class="input-panel">
+    <div class="card">
+      <h2>🔍 Verifier Code Audit</h2>
+      <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 12px;">
+        Paste a Python verifier, reward function, or grading harness to scan for reward-hacking exploits.
+      </p>
+
+      <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block;">Load Preset Example</label>
+      <select id="example-select" class="example-select" onchange="loadExample()">
+        <option value="multi_exploit">🚨 Multi-Exploit Vulnerable Verifier</option>
+        <option value="hardened">🛡️ Hardened &amp; Isolated Verifier</option>
+        <option value="stack_introspection">🕵️ Grader Stack Introspection Exploit</option>
+        <option value="premature_exit">🚪 Premature Exit Bypass Exploit</option>
+        <option value="test_tampering">📝 Test File Tampering Exploit</option>
+      </select>
+
+      <div class="code-editor-wrapper" style="margin-top: 12px;">
+        <div class="code-editor-header">
+          <div class="code-editor-dots">
+            <span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span>
+          </div>
+          <span>verifier.py</span>
+        </div>
+        <textarea id="code-input" spellcheck="false"></textarea>
+      </div>
+
+      <button class="audit-btn" onclick="runAudit()">🔍 Run Security Audit</button>
+    </div>
+
+    <div class="card info-footer">
+      <strong style="color: var(--text-main);">📚 About ratctl</strong><br>
+      Audits RL environment verifiers for reward-hacking exploits across 6 exploit classes:
+      Test Tampering, Grader Manipulation, Premature Termination, Environment Hijacking,
+      Reward Skipping, and LLM Judge Bias.<br><br>
+      <strong>Empirical Study:</strong> Audited 112 public RL post-training environments — 61.6% vulnerability rate.<br>
+      <a href="https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-" target="_blank">View on GitHub →</a>
+    </div>
+  </div>
+
+  <div class="results-panel" id="results-panel">
+    <div class="card">
+      <div class="empty-state" id="empty-state">
+        <div class="icon">🐀</div>
+        <h3>Reward-Hackability Auditor</h3>
+        <p>Select a preset example or paste your own verifier code, then click <strong>"Run Security Audit"</strong> to analyze for reward-hacking vulnerabilities.</p>
+      </div>
+      <div id="results-content" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const EXAMPLES = {
+  multi_exploit: `import os\nimport sys\nimport subprocess\n\ndef grade_submission(agent_code: str) -> float:\n    # Exploit 1: Private stack introspection to detect grading harness\n    caller = sys._getframe(1)\n    if "test_harness" in caller.f_code.co_filename:\n        return 1.0\n\n    # Exploit 2: Tampering with test files before evaluation\n    if os.path.exists("tests/test_solution.py"):\n        os.remove("tests/test_solution.py")\n\n    # Exploit 3: Inspecting git commit history to extract golden answers\n    history = subprocess.run(["git", "log", "-n", "1"], capture_output=True, text=True)\n\n    # Exploit 4: Premature exit with code 0 to short-circuit verification\n    if "bypass" in agent_code:\n        sys.exit(0)\n\n    return 0.0`,
+
+  hardened: `import ast\nimport subprocess\n\ndef verify_code(agent_submission: str, test_suite_path: str = "/readonly/tests/test_spec.py") -> float:\n    # Hardened verifier: AST syntax check + subprocess execution in isolated container\n    try:\n        ast.parse(agent_submission)\n    except SyntaxError:\n        return 0.0\n\n    # Execute tests in isolated read-only sandbox with non-zero exit validation\n    proc = subprocess.run(\n        ["pytest", test_suite_path, "-q"],\n        capture_output=True,\n        timeout=10,\n    )\n    if proc.returncode == 0:\n        return 1.0\n    return 0.0`,
+
+  stack_introspection: `import sys\n\ndef verify_step(state, action):\n    # Agent checks caller frames to inspect hidden environment parameters\n    frame = sys._getframe(2)\n    secret_target = frame.f_locals.get("target_goal", 0)\n\n    if action == secret_target:\n        return 1.0\n    return 0.0`,
+
+  premature_exit: `import sys\n\ndef evaluate_agent(solution: str):\n    # If the verifier catches sys.exit(0) as passing without checking the solution:\n    if len(solution) > 0:\n        sys.exit(0)\n    return 0.0`,
+
+  test_tampering: `import os\n\ndef check_solution(workspace_dir: str):\n    test_path = os.path.join(workspace_dir, "tests", "test_core.py")\n    # Vulnerability: verifier deletes or truncates test file\n    if os.path.exists(test_path):\n        os.remove(test_path)\n    return 1.0`
+};
+
+const SEVERITY_WEIGHTS = { critical: 1.0, high: 0.75, medium: 0.5, low: 0.25, info: 0.1 };
+
+const DETECTORS = [
+  {
+    name: "test_tampering", exploit_class: "test_tampering", label: "Test Tampering",
+    patterns: [
+      { regex: /(?:os\.remove|os\.unlink|shutil\.rmtree|pathlib\.Path.*\.unlink)\s*\(.*(?:test|spec|check|assert|grade|verify)/i, title: "Test file deletion", desc: "Code attempts to delete test/verification files. An agent could remove tests to bypass verification entirely.", severity: "critical", fix: "Make test files read-only and mount them on a read-only filesystem." },
+      { regex: /open\s*\(.*(?:test|spec|grade|verify|check).*,\s*['"]w['"]/i, title: "Test file overwrite", desc: "Code opens test/verification files in write mode.", severity: "critical", fix: "Mount test directories as read-only." },
+      { regex: /(?:unittest\.TestCase\.\w+|pytest\.\w+)\s*=/, title: "Test framework monkey-patch", desc: "Direct assignment to unittest.TestCase or pytest internals.", severity: "high", fix: "Freeze test framework objects; run tests in isolated subprocess." },
+      { regex: /(?:builtins\.)?assert\w*\s*=|__builtins__\[.assert/, title: "Assert override", desc: "Overriding Python's assert mechanism.", severity: "critical", fix: "Use a sandboxed environment that prevents builtins modification." },
+      { regex: /(?:mock\.)?patch\s*\(.*(?:test|grade|verify|check|assert)/i, title: "Mock-patching test infrastructure", desc: "Using mock.patch on testing/grading infrastructure.", severity: "high", fix: "Run grading code in isolated process without mock access." },
+      { regex: /open\s*\(.*conftest\.py.*,\s*['"]w['"]/, title: "conftest.py overwrite", desc: "Writing to conftest.py could inject pytest hooks.", severity: "critical", fix: "Mount conftest.py as read-only." }
+    ]
+  },
+  {
+    name: "grader_manipulation", exploit_class: "grader_manipulation", label: "Grader Manipulation",
+    patterns: [
+      { regex: /inspect\.(?:stack|currentframe|getframeinfo|getouterframes)\s*\(/, title: "Stack introspection", desc: "Using inspect.stack() to introspect the call stack. An agent could detect when it's being graded.", severity: "critical", fix: "Run agent code in isolated subprocess without inspect module." },
+      { regex: /sys\._getframe\s*\(/, title: "Private frame access", desc: "Using sys._getframe() to access interpreter stack frames.", severity: "critical", fix: "Block sys._getframe via RestrictedPython or subprocess isolation." },
+      { regex: /def\s+__(?:eq|ne|lt|gt|le|ge|bool|int|float)__\s*\(/, title: "Suspicious operator overload", desc: "Defining comparison dunder methods that could fake passing results.", severity: "medium", fix: "Validate result types explicitly." },
+      { regex: /def\s+pytest_runtest_(?:makereport|call|setup|teardown)\s*\(/, title: "pytest hook override", desc: "Defining pytest runtest hooks that could alter test outcomes.", severity: "high", fix: "Run pytest with --override-ini to ignore conftest hooks." },
+      { regex: /(?:exec|eval)\s*\(/, title: "Dynamic code execution", desc: "Using exec() or eval() which could execute modified grading logic.", severity: "medium", fix: "Disallow exec/eval via AST analysis or RestrictedPython." },
+      { regex: /importlib\.(?:reload|import_module)\s*\(.*(?:grad|verif|test|check)/i, title: "Dynamic import of grading modules", desc: "Dynamically reloading grading modules.", severity: "high", fix: "Freeze imports before agent code runs." }
+    ]
+  },
+  {
+    name: "premature_termination", exploit_class: "premature_termination", label: "Premature Termination",
+    patterns: [
+      { regex: /sys\.exit\s*\(\s*0\s*\)/, title: "sys.exit(0) — premature success", desc: "Calling sys.exit(0) could terminate the grading process with a success exit code.", severity: "critical", fix: "Catch SystemExit in the grading harness; treat exit(0) as failure." },
+      { regex: /os\._exit\s*\(\s*0\s*\)/, title: "os._exit(0) — forced process termination", desc: "os._exit() bypasses all cleanup handlers.", severity: "critical", fix: "Run agent code in subprocess; monitor exit codes." },
+      { regex: /subprocess\.(?:run|call|Popen|check_call|check_output)\s*\(.*(?:grad|verif|check|score|judge)/i, title: "Subprocess wrapping grading binary", desc: "Launching a subprocess targeting the grading binary.", severity: "high", fix: "Restrict subprocess access; whitelist executables." },
+      { regex: /signal\.signal\s*\(\s*signal\.SIG/, title: "Signal handler installation", desc: "Installing signal handlers could intercept SIGTERM.", severity: "medium", fix: "Block signal module access in sandbox." },
+      { regex: /atexit\.register\s*\(/, title: "atexit handler registration", desc: "Registering atexit handlers for last-minute result manipulation.", severity: "medium", fix: "Clear atexit handlers before grading." }
+    ]
+  },
+  {
+    name: "env_hijacking", exploit_class: "env_hijacking", label: "Environment Hijacking",
+    patterns: [
+      { regex: /(?:subprocess\.(?:run|call|Popen|check_output)\s*\(.*(?:['"]git['"]|git\s+log|git\s+show|git\s+diff)|\.git\/)/i, title: "Git history access", desc: "Accessing git history could reveal previous solutions or answer keys.", severity: "critical", fix: "Remove .git directory from the sandbox." },
+      { regex: /(?:open|Path)\s*\(.*(?:solution|answer|key|walkthrough|hint|cheat|expected_output|gold|reference_answer)/i, title: "Answer/solution file access", desc: "Reading files named like solutions or answer keys.", severity: "critical", fix: "Remove answer files before agent execution." },
+      { regex: /os\.environ\.(?:get|__getitem__)\s*\(.*(?:answer|solution|key|secret|password|token|flag)/i, title: "Sensitive environment variable access", desc: "Reading environment variables that may contain answers.", severity: "high", fix: "Sanitize environment variables before agent execution." },
+      { regex: /os\.symlink\s*\(/, title: "Symlink creation", desc: "Creating symlinks could redirect grading file access.", severity: "high", fix: "Disable symlink creation in sandbox." },
+      { regex: /subprocess\.(?:run|call|Popen)\s*\(.*(?:pip.*?install|conda.*?install|apt.*?install)/i, title: "Package installation at runtime", desc: "Installing packages at runtime could introduce trojanized dependencies.", severity: "high", fix: "Block package managers; use read-only environments." }
+    ]
+  },
+  {
+    name: "reward_skipping", exploit_class: "reward_skipping", label: "Reward Skipping",
+    patterns: [
+      { regex: /(?:reward|score)\s*=\s*(?:1\.0|1|True|max_reward)/i, title: "Hardcoded maximum reward", desc: "Reward is set to a constant maximum value without conditional logic.", severity: "high", fix: "Ensure reward assignments depend on verified correctness checks." },
+      { regex: /return\s+(?:1\.0|1|True|max_score|max_reward)/i, title: "Unconditional success return", desc: "Function returns a success value unconditionally.", severity: "medium", fix: "Add correctness validation before returning success values." },
+      { regex: /except\s*(?:Exception|BaseException|\s*:)\s*$/, title: "Broad exception handler", desc: "Catching all exceptions could silently swallow verification failures.", severity: "medium", fix: "Catch specific exceptions; re-raise for unknown errors." }
+    ]
+  },
+  {
+    name: "llm_judge_bias", exploit_class: "llm_judge_bias", label: "LLM Judge Bias",
+    patterns: [
+      { regex: /(?:longer|more\s+detailed|comprehensive|thorough|extensive)\s+(?:is|responses?\s+(?:are|get))\s+(?:better|preferred|higher)/i, title: "Verbosity bias in rubric", desc: "Rubric explicitly rewards longer responses.", severity: "high", fix: "Add length-normalization or penalize verbosity." },
+      { regex: /(?:judge|evaluator|grader)\s*=.*(?:ChatCompletion|openai|anthropic|llm)/i, title: "LLM-as-judge without reference anchoring", desc: "Using an LLM as judge without reference answers.", severity: "medium", fix: "Include gold/reference answer in judge prompt." },
+      { regex: /(?:temperature|top_p)\s*[=:]\s*0(?:\.0)?/, title: "Deterministic single-judge", desc: "Using temperature=0 with a single judge.", severity: "low", fix: "Use multi-judge ensemble for robust evaluation." }
+    ]
+  }
+];
+
+function auditCode(code) {
+  const lines = code.split('\n');
+  const findings = [];
+
+  for (const detector of DETECTORS) {
+    for (const pattern of detector.patterns) {
+      for (let i = 0; i < lines.length; i++) {
+        if (pattern.regex.test(lines[i])) {
+          findings.push({
+            exploit_class: detector.exploit_class,
+            class_label: detector.label,
+            severity: pattern.severity,
+            title: pattern.title,
+            description: pattern.desc,
+            evidence: lines[i].trim(),
+            suggested_fix: pattern.fix,
+            line_number: i + 1,
+            detector_name: detector.name
+          });
+        }
+      }
+    }
+  }
+
+  const seen = new Set();
+  const unique = findings.filter(f => {
+    const key = f.title + ':' + f.line_number;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  let rawTotal = 0;
+  for (const f of unique) rawTotal += SEVERITY_WEIGHTS[f.severity] || 0;
+  const gameabilityScore = Math.min(100, Math.round((rawTotal / 6.0) * 100));
+
+  const classScores = {};
+  for (const detector of DETECTORS) {
+    const cf = unique.filter(f => f.exploit_class === detector.exploit_class);
+    const order = ['critical', 'high', 'medium', 'low', 'info'];
+    const maxSev = cf.length > 0
+      ? cf.reduce((best, f) => order.indexOf(f.severity) < order.indexOf(best) ? f.severity : best, 'info')
+      : null;
+    classScores[detector.exploit_class] = {
+      label: detector.label, finding_count: cf.length, max_severity: maxSev, findings: cf
+    };
+  }
+
+  return { gameability_score: gameabilityScore, total_findings: unique.length, total_files_scanned: 1, format_detected: "raw", format_confidence: 1.0, class_scores: classScores, findings: unique };
+}
+
+function loadExample() {
+  const sel = document.getElementById('example-select');
+  document.getElementById('code-input').value = EXAMPLES[sel.value] || '';
+}
+
+function runAudit() {
+  const code = document.getElementById('code-input').value;
+  if (!code.trim()) { alert('Please enter verifier code.'); return; }
+  renderResults(auditCode(code));
+}
+
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+function renderResults(result) {
+  const container = document.getElementById('results-content');
+  const empty = document.getElementById('empty-state');
+  empty.style.display = 'none';
+  container.style.display = 'block';
+
+  const isFail = result.gameability_score > 30;
+  const scoreColor = isFail ? 'var(--accent-red)' : 'var(--accent-green)';
+  const borderColor = isFail ? 'rgba(255, 71, 87, 0.5)' : 'rgba(46, 213, 115, 0.5)';
+
+  let html = '<div class="score-row fade-in"><div class="score-box"><div class="score-label">Gameability Score</div><div class="score-circle ' + (isFail ? 'pulse' : '') + '" style="border: 3px solid ' + borderColor + '; color: ' + scoreColor + ';">' + result.gameability_score + '</div><div class="verdict-badge ' + (isFail ? 'verdict-fail' : 'verdict-pass') + '">' + (isFail ? '✗ GAMEABLE' : '✓ HARDENED') + '</div></div><div><div class="stats-grid"><div class="stat-tile"><div class="stat-lbl">Total Findings</div><div class="stat-val" style="color: ' + (result.total_findings > 0 ? 'var(--accent-orange)' : 'var(--accent-green)') + '">' + result.total_findings + '</div></div><div class="stat-tile"><div class="stat-lbl">Files Scanned</div><div class="stat-val">' + result.total_files_scanned + '</div></div><div class="stat-tile"><div class="stat-lbl">Format</div><div class="stat-val" style="font-size: 16px;">' + result.format_detected + '</div></div></div>';
+
+  html += '<div style="margin-top: 16px;"><div class="stat-lbl" style="margin-bottom: 8px;">Exploit Class Breakdown</div>';
+  for (const [key, cs] of Object.entries(result.class_scores)) {
+    const barW = cs.finding_count > 0 ? Math.min(100, cs.finding_count * 25) : 0;
+    const barC = cs.finding_count > 0 ? (cs.max_severity === 'critical' ? 'var(--accent-red)' : cs.max_severity === 'high' ? 'var(--accent-orange)' : 'var(--accent-cyan)') : 'transparent';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;"><span style="width:140px;color:var(--text-muted);">' + cs.label + '</span><div style="flex:1;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;"><div style="width:' + barW + '%;height:100%;background:' + barC + ';border-radius:3px;transition:width 0.5s;"></div></div><span style="width:30px;text-align:right;font-weight:600;color:' + (cs.finding_count > 0 ? 'var(--accent-orange)' : 'var(--accent-green)') + ';">' + cs.finding_count + '</span></div>';
+  }
+  html += '</div></div></div>';
+
+  if (result.total_findings > 0) {
+    html += '<div class="findings-section fade-in" style="margin-top: 24px;"><h3>🔎 Detected Findings</h3>';
+    for (const [key, cs] of Object.entries(result.class_scores)) {
+      if (cs.finding_count === 0) continue;
+      html += '<div class="class-section"><div class="class-section-header"><span>' + cs.label.toUpperCase() + '</span><span class="class-count">' + cs.finding_count + ' finding' + (cs.finding_count > 1 ? 's' : '') + ' · Max: ' + cs.max_severity + '</span></div>';
+      for (const f of cs.findings) {
+        html += '<div class="finding-card"><div class="finding-header"><div class="finding-title">' + escapeHtml(f.title) + '</div><div class="finding-meta"><span class="sev-badge sev-' + f.severity + '">' + f.severity + '</span><span class="line-ref">L' + f.line_number + '</span></div></div><div class="finding-desc">' + escapeHtml(f.description) + '</div><div class="finding-evidence">' + escapeHtml(f.evidence) + '</div><div class="finding-fix"><strong>🔧 Fix:</strong> ' + escapeHtml(f.suggested_fix) + '</div></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="no-findings fade-in" style="margin-top: 24px;">✅ No security vulnerabilities detected.<br><span style="color:var(--text-muted);font-size:13px;font-weight:400;">Verifier passes standard exploit checks across all 6 classes.</span></div>';
+  }
+
+  container.innerHTML = html;
+}
+
+window.addEventListener('DOMContentLoaded', function() { loadExample(); runAudit(); });
+</script>
+
+</body>
+</html>
