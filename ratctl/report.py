@@ -133,7 +133,7 @@ def _render_rich(score: AuditScore) -> str:
         return _render_text(score)
 
     buf = StringIO()
-    console = Console(file=buf, force_terminal=True, width=100)
+    console = Console(file=buf, force_terminal=True, width=100, safe_box=True)
 
     # Header
     score_color = _score_color(score.gameability_score)
@@ -142,7 +142,7 @@ def _render_rich(score: AuditScore) -> str:
     header.append(f"{score.gameability_score}/100", style=f"bold {score_color}")
 
     console.print()
-    console.print(Panel(header, title="🐀 RATCTL Audit Report", border_style=score_color))
+    console.print(Panel(header, title="RATCTL Audit Report", border_style=score_color))
 
     # Summary table
     summary = Table(show_header=False, box=None, padding=(0, 2))
@@ -156,7 +156,7 @@ def _render_rich(score: AuditScore) -> str:
     console.print()
 
     if score.total_findings == 0:
-        console.print("  [green]✓ No exploitability findings detected.[/green]")
+        console.print("  [green][PASS] No exploitability findings detected.[/green]")
         console.print()
         return buf.getvalue()
 
@@ -179,7 +179,7 @@ def _render_rich(score: AuditScore) -> str:
         class_table.add_row(
             cs.exploit_class.value.replace("_", " ").title(),
             str(cs.finding_count),
-            Text(cs.max_severity.value if cs.max_severity else "—", style=sev_style),
+            Text(cs.max_severity.value if cs.max_severity else "-", style=sev_style),
             f"{cs.raw_score:.2f}",
         )
 
@@ -205,7 +205,7 @@ def _render_rich(score: AuditScore) -> str:
                     f"[dim]{finding.description}[/dim]\n\n"
                     f"[bold]Evidence:[/bold] {finding.evidence[:200]}\n\n"
                     f"[green]Fix:[/green] {finding.suggested_fix}",
-                    title=f"📍 {loc}",
+                    title=f"{loc}",
                     border_style="dim",
                 )
             )
@@ -214,7 +214,7 @@ def _render_rich(score: AuditScore) -> str:
         console.print()
         console.print("[yellow]Errors:[/yellow]")
         for err in score.errors:
-            console.print(f"  • {err}", style="yellow")
+            console.print(f"  * {err}", style="yellow")
 
     return buf.getvalue()
 

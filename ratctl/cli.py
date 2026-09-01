@@ -134,7 +134,10 @@ def audit(
     if output:
         click.echo(f"Report written to {output}")
     else:
-        click.echo(report)
+        try:
+            click.echo(report)
+        except UnicodeEncodeError:
+            sys.stdout.buffer.write(report.encode("utf-8", errors="replace") + b"\n")
 
     # Check fail-on threshold
     if fail_on:
