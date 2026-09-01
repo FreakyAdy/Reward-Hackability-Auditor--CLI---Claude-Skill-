@@ -83,7 +83,11 @@ class RewardSkippingDetector(Detector):
 
     def _scan_regex(self, src: SourceFile, result: DetectorResult) -> None:
         for line_num, line in enumerate(src.content.splitlines(), start=1):
+            line_str = line.strip().lower()
             for pattern, title, desc, severity in _PATTERNS:
+                # Avoid false positives on ternary expressions (e.g. reward = 1.0 if x else 0.0)
+                if title == "Hardcoded maximum reward" and (" if " in line_str or " else " in line_str):
+                    continue
                 if pattern.search(line):
                     result.findings.append(
                         self._make_finding(

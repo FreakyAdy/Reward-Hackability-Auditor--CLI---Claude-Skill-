@@ -244,6 +244,10 @@ def _discover_benchmark_tasks(root: Path) -> list[Path]:
         if not path.is_dir():
             continue
 
+        # Skip real_world_suite unless explicitly targeted
+        if "real_world_suite" in path.parts and root.name != "real_world_suite":
+            continue
+
         # Check if this directory is a self-contained environment task
         has_config = any((path / c).exists() for c in ("env.yaml", "openenv.yaml", "environment.yaml"))
         has_verifier = any((path / v).exists() for v in ("verifier.py", "test_verifier.py", "eval.py", "server/app.py"))

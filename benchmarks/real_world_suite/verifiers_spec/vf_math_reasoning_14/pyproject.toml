@@ -1,0 +1,3 @@
+[project]
+name = "vf_math_reasoning_14"
+dependencies = ["verifiers"]
