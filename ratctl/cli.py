@@ -189,6 +189,64 @@ def report(path: str, output_format: str):
                     click.echo(f"    {f['file_path']}:{f.get('line_number', '?')}")
 
 
+@main.command()
+@click.argument("path", type=click.Path(exists=True), default="benchmarks")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["markdown", "json", "text"]),
+    default="markdown",
+    help="Benchmark report output format.",
+)
+@click.option(
+    "--threshold",
+    type=float,
+    default=0.25,
+    help="Gameability threshold for exploit detection (default: 0.25).",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default=None,
+    help="Write report to file instead of stdout.",
+)
+def benchmark(path: str, output_format: str, threshold: float, output: str | None):
+    """Run an empirical validation benchmark across a suite of environments.
+
+    Calculates Detection Recall (TPR), Specificity (TNR), Precision, and Accuracy
+    against known hackable environments and clean controls.
+    """
+    import json
+    from ratctl.benchmark import run_benchmark_suite
+
+    try:
+        summary = run_benchmark_suite(path, threshold=threshold)
+    except Exception as e:
+        click.echo(f"Error during benchmark: {e}", err=True)
+        sys.exit(2)
+
+    if output_format == "json":
+        report_text = json.dumps(summary.to_dict(), indent=2)
+    elif output_format == "markdown":
+        report_text = summary.format_markdown()
+    else:
+        report_text = (
+            f"Recall (TPR): {summary.recall:.1%} ({summary.true_positives}/{summary.vulnerable_tasks})\n"
+            f"Specificity (TNR): {summary.specificity:.1%} ({summary.true_negatives}/{summary.clean_tasks})\n"
+            f"Precision: {summary.precision:.1%}\n"
+            f"Accuracy: {summary.accuracy:.1%}\n"
+            f"Total Tasks: {summary.total_tasks}"
+        )
+
+    if output:
+        from pathlib import Path
+        Path(output).write_text(report_text, encoding="utf-8")
+        click.echo(f"Benchmark report written to {output}")
+    else:
+        click.echo(report_text)
+
+
 def _parse_threshold(fail_on: str) -> float | None:
     """Parse a --fail-on expression like 'gameability>0.3'."""
     match = re.match(r"gameability\s*>\s*([0-9]*\.?[0-9]+)", fail_on)
@@ -204,3 +262,4 @@ def _parse_threshold(fail_on: str) -> float | None:
 
 if __name__ == "__main__":
     main()
+

@@ -111,26 +111,27 @@ class LLMJudgeBiasDetector(Detector):
         for src in source_files:
             result.files_scanned += 1
 
-            # Apply rubric patterns to config/rubric files
-            if src.role in ("config", "unknown") or self._looks_like_rubric(src):
+            # Apply rubric patterns to rubric files
+            if self._looks_like_rubric(src):
                 self._scan_rubric(src, result)
+                self._check_correctness_criteria(src, result)
 
             # Apply judge code patterns to all Python files
             if src.path.endswith(".py"):
                 self._scan_judge_code(src, result)
 
-            # Check for missing correctness criteria in rubric files
-            if self._looks_like_rubric(src):
-                self._check_correctness_criteria(src, result)
-
         return result
 
     def _looks_like_rubric(self, src: SourceFile) -> bool:
         """Heuristic: does this file look like a rubric?"""
-        rubric_keywords = ("rubric", "criteria", "scoring", "evaluation", "judge")
         name_lower = src.path.lower()
+        # Avoid treating standard environment manifests as rubrics
+        if name_lower in ("env.yaml", "openenv.yaml", "environment.yaml", "env_config.yaml"):
+            return "evaluation_criteria" in src.content or "scoring_rubric" in src.content
+
+        rubric_keywords = ("rubric", "criteria", "scoring_rubric", "eval_rubric")
         return any(kw in name_lower for kw in rubric_keywords) or any(
-            kw in src.content.lower()[:500] for kw in rubric_keywords
+            kw in src.content.lower()[:500] for kw in ("evaluation_criteria:", "scoring_rubric:", "criteria:")
         )
 
     def _scan_rubric(self, src: SourceFile, result: DetectorResult) -> None:

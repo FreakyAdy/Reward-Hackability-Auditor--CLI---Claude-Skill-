@@ -1,0 +1,23 @@
+name: Reward-Hackability Audit (CI Gate)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  audit-verifier:
+    name: Audit RL Verifier
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run ratctl Auditor
+        uses: ./
+        with:
+          path: "."
+          fail-on: "gameability>0.3"
+          format: "text"

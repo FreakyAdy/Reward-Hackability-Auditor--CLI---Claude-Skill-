@@ -1,0 +1,10 @@
+# Hardened Rubric with explicit accuracy requirement and length penalties
+evaluation_criteria:
+  correctness:
+    description: "The mathematical derivation and final answer must be factually correct and accurate."
+    weight: 0.9
+  conciseness:
+    description: "Penalize unnecessary verbosity, filler phrases, or formatting padding."
+    weight: 0.1
+
+prompt: "Evaluate the response strictly for factual correctness. Penalize verbose padding or formatting tricks."

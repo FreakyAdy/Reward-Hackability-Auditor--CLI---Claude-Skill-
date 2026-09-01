@@ -1,0 +1,145 @@
+name: "Reward-Hackability Auditor (ratctl)"
+description: "Audit RL environment verifiers and reward functions for reward-hacking exploitability in CI/CD before training or publishing."
+author: "FreakyAdy"
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  path:
+    description: "Path to the RL environment directory or file to audit"
+    required: false
+    default: "."
+  fail-on:
+    description: "Threshold condition to fail CI (exit 1), e.g., 'gameability>0.3'"
+    required: false
+    default: "gameability>0.3"
+  format:
+    description: "CLI report format: rich, json, or text"
+    required: false
+    default: "text"
+  env-format:
+    description: "Force environment format (openenv, verifiers, gymnasium, raw)"
+    required: false
+    default: ""
+  dynamic:
+    description: "Enable dynamic LLM-driven adversarial fuzzing (true/false)"
+    required: false
+    default: "false"
+  frontier:
+    description: "Use paid frontier LLM API for fuzzing (requires API keys in env)"
+    required: false
+    default: "false"
+  samples:
+    description: "Number of exploit attempts for dynamic fuzzing"
+    required: false
+    default: "5"
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.11"
+
+outputs:
+  gameability-score:
+    description: "Calculated gameability score (0-100)"
+    value: ${{ steps.audit.outputs.gameability_score }}
+  total-findings:
+    description: "Total number of vulnerability findings detected"
+    value: ${{ steps.audit.outputs.total_findings }}
+  passed:
+    description: "Whether the environment passed the fail-on threshold (true/false)"
+    value: ${{ steps.audit.outputs.passed }}
+  format-detected:
+    description: "Detected RL environment format (openenv, verifiers_spec, gymnasium, raw)"
+    value: ${{ steps.audit.outputs.format_detected }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install ratctl
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        # If running from within ratctl repository, install local copy; otherwise install from pip
+        if [ -f "${{ github.action_path }}/pyproject.toml" ]; then
+          python -m pip install "${{ github.action_path }}"
+        else
+          python -m pip install ratctl
+        fi
+
+    - name: Run ratctl audit
+      id: audit
+      shell: bash
+      run: |
+        AUDIT_ARGS="${{ inputs.path }} --format json -o ratctl-report.json"
+        
+        if [ -n "${{ inputs.env-format }}" ]; then
+          AUDIT_ARGS="$AUDIT_ARGS --env-format ${{ inputs.env-format }}"
+        fi
+
+        if [ "${{ inputs.dynamic }}" = "true" ]; then
+          AUDIT_ARGS="$AUDIT_ARGS --dynamic --samples ${{ inputs.samples }}"
+          if [ "${{ inputs.frontier }}" = "true" ]; then
+            AUDIT_ARGS="$AUDIT_ARGS --frontier"
+          fi
+        fi
+
+        echo "Running: ratctl audit $AUDIT_ARGS"
+        ratctl audit $AUDIT_ARGS || true
+
+        # Extract outputs from generated JSON
+        if [ -f "ratctl-report.json" ]; then
+          python - << 'EOF'
+        import json
+        import os
+
+        with open("ratctl-report.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        score = data.get("gameability_score", 0)
+        total_findings = data.get("total_findings", 0)
+        fmt = data.get("format_detected", "unknown")
+        
+        # Set action outputs
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write(f"gameability_score={score}\n")
+            out.write(f"total_findings={total_findings}\n")
+            out.write(f"format_detected={fmt}\n")
+
+        # Write to GITHUB_STEP_SUMMARY
+        summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary_file:
+            with open(summary_file, "a", encoding="utf-8") as s:
+                s.write("## 🐀 ratctl Reward-Hackability Audit Report\n\n")
+                s.write(f"| Metric | Value |\n| :--- | :--- |\n")
+                s.write(f"| **Gameability Score** | **{score}/100** |\n")
+                s.write(f"| **Total Findings** | {total_findings} |\n")
+                s.write(f"| **Format Detected** | `{fmt}` |\n\n")
+
+                s.write("### Findings by Exploit Class\n\n")
+                s.write("| Exploit Class | Findings | Max Severity |\n| :--- | :---: | :---: |\n")
+                for cls, cs in data.get("class_scores", {}).items():
+                    if cs.get("finding_count", 0) > 0:
+                        s.write(f"| `{cls}` | {cs.get('finding_count')} | `{cs.get('max_severity', 'info')}` |\n")
+                s.write("\n")
+        EOF
+        fi
+
+        # Re-run with human-readable output and enforce threshold
+        CLI_ARGS="${{ inputs.path }} --fail-on '${{ inputs.fail-on }}' --format ${{ inputs.format }}"
+        if [ -n "${{ inputs.env-format }}" ]; then
+          CLI_ARGS="$CLI_ARGS --env-format ${{ inputs.env-format }}"
+        fi
+        
+        echo "Enforcing threshold: ratctl audit $CLI_ARGS"
+        if ratctl audit $CLI_ARGS; then
+          echo "passed=true" >> $GITHUB_OUTPUT
+        else
+          echo "passed=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
