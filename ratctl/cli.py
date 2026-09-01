@@ -311,13 +311,13 @@ def dashboard_cmd(path: str, port: int):
 
 
 @main.command(name="tui")
-@click.argument("log_path", type=click.Path(), default="logs/run.jsonl")
+@click.argument("path", type=click.Path(), default=".")
 @click.option("--no-live", is_flag=True, help="Render a single frame snapshot without full-screen live updates.")
-def tui_cmd(log_path: str, no_live: bool):
-    """Launch the live interactive Terminal UI (TUI) dashboard."""
+def tui_cmd(path: str, no_live: bool):
+    """Launch the live interactive Terminal UI (TUI) dashboard for audit results or in-training monitoring."""
     from ratctl.tui import run_tui
 
-    run_tui(log_path=log_path, live_mode=not no_live)
+    run_tui(target_path=path, live_mode=not no_live)
 
 
 
