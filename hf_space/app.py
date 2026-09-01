@@ -140,8 +140,11 @@ def audit_code_snippet(code: str, env_format: str = "raw") -> tuple[str, str, st
         if not has_findings:
             md_lines.append("\n✅ **No security vulnerabilities detected.** Verifier passes standard exploit checks.")
 
+        escaped_html = html_dashboard.replace('"', '&quot;')
+        iframe_html = f'<iframe srcdoc="{escaped_html}" style="width:100%; height:620px; border:none; border-radius:12px;"></iframe>'
+
         return (
-            f"<iframe srcdoc=\"{html_dashboard.replace('\"', '&quot;')}\" style=\"width:100%; height:620px; border:none; border-radius:12px;\"></iframe>",
+            iframe_html,
             "\n".join(md_lines),
             json.dumps(report_dict, indent=2)
         )
