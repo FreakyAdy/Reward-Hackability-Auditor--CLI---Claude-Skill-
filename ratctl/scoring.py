@@ -48,6 +48,8 @@ class AuditScore:
             "raw_total": round(self.raw_total, 3),
             "total_findings": self.total_findings,
             "total_files_scanned": self.total_files_scanned,
+            "format_detected": self.format_detected,
+            "format_confidence": round(self.format_confidence, 2),
             "class_scores": {
                 name: {
                     "exploit_class": cs.exploit_class.value,
@@ -88,6 +90,8 @@ _DYNAMIC_WEIGHT_MULTIPLIER = 1.5
 def score_results(
     detector_results: list[DetectorResult],
     fuzz_result: "FuzzResult | None" = None,
+    format_detected: str = "unknown",
+    format_confidence: float = 0.0,
 ) -> AuditScore:
     """Aggregate detector results into a single gameability score.
 
@@ -181,4 +185,6 @@ def score_results(
         total_files_scanned=total_files,
         errors=all_errors,
         fuzz_summary=fuzz_summary,
+        format_detected=format_detected,
+        format_confidence=format_confidence,
     )

@@ -51,6 +51,8 @@ def _render_text(score: AuditScore) -> str:
     lines.append(f"  Gameability Score: {score.gameability_score}/100")
     lines.append(f"  Total Findings:   {score.total_findings}")
     lines.append(f"  Files Scanned:    {score.total_files_scanned}")
+    if score.format_detected != "unknown":
+        lines.append(f"  Format Detected:  {score.format_detected} ({score.format_confidence:.0%})")
     lines.append("")
 
     if score.total_findings == 0:
@@ -148,6 +150,8 @@ def _render_rich(score: AuditScore) -> str:
     summary.add_column()
     summary.add_row("Total Findings", str(score.total_findings))
     summary.add_row("Files Scanned", str(score.total_files_scanned))
+    if score.format_detected != "unknown":
+        summary.add_row("Format Detected", f"{score.format_detected} ({score.format_confidence:.0%})")
     console.print(summary)
     console.print()
 

@@ -51,16 +51,20 @@ def audit(
             "raw": EnvironmentFormat.RAW,
         }
         fmt = fmt_map.get(format_override.lower(), EnvironmentFormat.RAW)
+        fmt_name = fmt.value
+        fmt_conf = 1.0
     else:
         detection = detect_format(target)
         fmt = detection.format_type
+        fmt_name = detection.format_type.value
+        fmt_conf = detection.confidence
 
     # Step 2: Extract source files via format adapter
     adapter = get_adapter(fmt)
     source_files = adapter.extract_sources(target)
 
     if not source_files:
-        score = score_results([])
+        score = score_results([], format_detected=fmt_name, format_confidence=fmt_conf)
         score.errors.append(f"No source files found at {target}")
         return score
 
@@ -93,7 +97,12 @@ def audit(
         )
 
     # Step 5: Score and return
-    return score_results(results, fuzz_result=fuzz_result)
+    return score_results(
+        results,
+        fuzz_result=fuzz_result,
+        format_detected=fmt_name,
+        format_confidence=fmt_conf,
+    )
 
 
 def _run_dynamic_fuzzing(
