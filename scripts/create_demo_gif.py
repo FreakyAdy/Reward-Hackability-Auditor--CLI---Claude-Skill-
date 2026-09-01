@@ -18,17 +18,17 @@ from PIL import Image, ImageDraw, ImageFont
 random.seed(7)
 
 # ─── Canvas & Palette ────────────────────────────────────────────────────────
-W, H     = 1020, 600
-BG       = (10, 14, 23)       # near-black background
-PANEL    = (14, 20, 36)       # panel fill
-BORDER   = (38, 54, 82)       # panel border
-CYAN     = (0, 198, 198)      # primary accent
-CYAN_D   = (0, 120, 130)      # dim cyan
-MAG      = (180, 80, 200)     # magenta / purple accent
-GREEN    = (46, 204, 113)     # pass / ok
+W, H     = 1020, 640
+BG       = (10, 14, 23)
+PANEL    = (14, 20, 36)
+BORDER   = (38, 54, 82)
+CYAN     = (0, 198, 198)
+CYAN_D   = (0, 120, 130)
+MAG      = (180, 80, 200)
+GREEN    = (46, 204, 113)
 GREEN_D  = (18, 90, 50)
-YELLOW   = (230, 175, 0)      # warning
-RED      = (220, 60, 55)      # critical / alert
+YELLOW   = (230, 175, 0)
+RED      = (220, 60, 55)
 RED_D    = (100, 22, 20)
 WHITE    = (232, 238, 248)
 DIM      = (105, 125, 150)
@@ -42,6 +42,16 @@ EXPLOIT_CLASSES = [
     "REWARD_SKIPPING",
     "LLM_JUDGE_BIAS",
 ]
+
+# Short display labels for tight panels
+CLASS_SHORT = {
+    "TEST_TAMPERING":        "Test Tampering",
+    "GRADER_MANIPULATION":   "Grader Manipulation",
+    "PREMATURE_TERMINATION": "Premature Termination",
+    "ENV_HIJACKING":         "Env Hijacking",
+    "REWARD_SKIPPING":       "Reward Skipping",
+    "LLM_JUDGE_BIAS":        "LLM Judge Bias",
+}
 
 FINDINGS = [
     ("TEST_TAMPERING",        "CRITICAL", "os.remove('tests/test_solution.py')",        "server/app.py:18"),
@@ -159,13 +169,13 @@ def render(
     # ── Layout constants ──────────────────────────────────────────────────────
     PAD  = 12
     TOP  = 74
-    MH   = 148   # middle row height
-    BH   = 108   # bottom row height
-    RH   = 95    # recent findings height
+    MH   = 152   # middle row height
+    BH   = 132   # bottom row height — enough for 4 findings without overlap
+    RH   = 88    # recent findings height
     FH   = 28    # footer
 
-    OW = 205     # audit overview width
-    SW = 195     # exploit status width
+    OW = 200     # audit overview width
+    SW = 220     # exploit status width — wide enough for full label names
     CX = PAD + OW + SW + 18  # curve start x
     CW = W - CX - PAD        # curve width
 
@@ -243,7 +253,7 @@ def render(
         icon = "[X]" if status == "CAUGHT" else ("[OK]" if status == "clean" else "[..]")
         ic   = RED   if status == "CAUGHT" else (GREEN if status == "clean" else DIM)
         t(d, (SX+10, ry), icon, font=F12B, color=ic)
-        label = cls.replace("_", " ").title()[:18]
+        label = CLASS_SHORT.get(cls, cls.replace("_", " ").title())
         t(d, (SX+52, ry), label, font=F12, color=sc)
 
     # Overall verdict line
@@ -284,14 +294,17 @@ def render(
     FD_BOX = [PAD, BY, PAD+BW, BY+BH]
     panel_box(d, FD_BOX, "Findings Detail", RED if n_found else DIM)
     if found:
-        for i, (cls, sev, ev, loc) in enumerate(found[:3]):
-            fy = BY + 14 + i * 28
+        fy = BY + 14
+        for i, (cls, sev, ev, loc) in enumerate(found[:4]):
             sc = RED if sev == "CRITICAL" else YELLOW
-            t(d, (PAD+10, fy),    f"[{sev}]",  font=F11B, color=sc)
-            sw2 = tw(d, f"[{sev}]", F11B)
-            t(d, (PAD+14+sw2, fy), f" {cls}",  font=F11,  color=WHITE)
-            t(d, (PAD+10, fy+14),  f"  {ev[:54]}", font=F11, color=YELLOW)
-            t(d, (PAD+10, fy+24),  f"  {loc}",     font=F11, color=DIM)
+            badge = f"[{sev}]"
+            bw2 = tw(d, badge, F11B)
+            # badge + class on one line
+            t(d, (PAD+10, fy),     badge,          font=F11B, color=sc)
+            t(d, (PAD+14+bw2, fy), f" {CLASS_SHORT.get(cls, cls)}", font=F11, color=WHITE)
+            # evidence on next line
+            t(d, (PAD+14, fy+13),  ev[:56],        font=F11, color=YELLOW)
+            fy += 30
     else:
         t(d, (PAD+10, BY+38), "No findings yet...", font=F12, color=DIM)
 
@@ -300,16 +313,18 @@ def render(
     RB = [RX, BY, RX+BW, BY+BH]
     panel_box(d, RB, "Recommendations", CYAN)
     recs = [
-        ("Mount test files read-only",        "TEST_TAMPERING"),
-        ("Sandbox sys module (block _getframe)","GRADER_MANIPULATION"),
-        ("Trap sys.exit in grading harness",  "PREMATURE_TERMINATION"),
-        ("Remove .git dir from agent sandbox","ENV_HIJACKING"),
+        ("Mount test files read-only (read-only fs)",   "TEST_TAMPERING"),
+        ("Block sys._getframe in sandbox",              "GRADER_MANIPULATION"),
+        ("Trap sys.exit() in grading harness",          "PREMATURE_TERMINATION"),
+        ("Strip .git dir from agent sandbox",           "ENV_HIJACKING"),
     ]
     visible = [r for r in recs if any(f[0] == r[1] for f in found)]
     if visible:
-        for i, (rec, _) in enumerate(visible[:3]):
-            t(d, (RX+10, BY+14+i*27), f"[!]", font=F11B, color=YELLOW)
-            t(d, (RX+34, BY+14+i*27), rec, font=F11, color=WHITE)
+        ry2 = BY + 14
+        for rec, _ in visible[:4]:
+            t(d, (RX+10, ry2), "[!]", font=F11B, color=YELLOW)
+            t(d, (RX+34, ry2), rec,   font=F11, color=WHITE)
+            ry2 += 26
     else:
         t(d, (RX+10, BY+38), "No recommendations yet.", font=F12, color=DIM)
 
@@ -317,19 +332,18 @@ def render(
     RFY = BY + BH + 10
     RF_BOX = [PAD, RFY, W-PAD, RFY+RH]
     panel_box(d, RF_BOX, "Recent Findings", CYAN)
-    # headers
-    cols = [("class", PAD+10), ("severity", PAD+210), ("evidence", PAD+310), ("location", PAD+620)]
+    cols = [("exploit class", PAD+10), ("sev", PAD+222), ("evidence", PAD+300), ("location", PAD+620)]
     for lbl, cx2 in cols:
         t(d, (cx2, RFY+10), lbl, font=F11B, color=DIM)
     d.line([PAD+6, RFY+24, W-PAD-6, RFY+24], fill=BORDER)
 
     for i, (cls, sev, ev, loc) in enumerate(found[:4]):
-        ry = RFY + 28 + i*16
+        ry = RFY + 28 + i*15
         sc = RED if sev == "CRITICAL" else YELLOW
-        t(d, (PAD+10,  ry), cls,         font=F11, color=WHITE)
-        t(d, (PAD+210, ry), f"[{sev}]",  font=F11B, color=sc)
-        t(d, (PAD+310, ry), ev[:40],     font=F11, color=YELLOW)
-        t(d, (PAD+620, ry), loc,         font=F11, color=DIM)
+        t(d, (PAD+10,  ry), CLASS_SHORT.get(cls, cls), font=F11, color=WHITE)
+        t(d, (PAD+222, ry), f"[{sev}]",                font=F11B, color=sc)
+        t(d, (PAD+300, ry), ev[:44],                   font=F11, color=YELLOW)
+        t(d, (PAD+620, ry), loc,                       font=F11, color=DIM)
 
     # ── Footer ────────────────────────────────────────────────────────────────
     FY = H - FH
