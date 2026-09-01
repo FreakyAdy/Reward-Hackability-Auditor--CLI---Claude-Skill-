@@ -238,7 +238,13 @@ ratctl audit ./my_environment --dynamic
 export RATCTL_OPENAI_API_KEY="sk-..."
 ratctl audit ./my_environment --dynamic --frontier --samples 10
 
-# 5. Output structured JSON for security telemetry
+# 5. Launch full-screen Terminal TUI Dashboard
+ratctl tui
+
+# 6. Launch interactive Web Dashboard UI in browser
+ratctl ui ./my_environment
+
+# 7. Output structured JSON for security telemetry
 ratctl audit ./my_environment --format json -o audit-report.json
 
 ### Runnable Examples

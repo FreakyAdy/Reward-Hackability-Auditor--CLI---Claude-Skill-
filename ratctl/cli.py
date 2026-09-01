@@ -287,6 +287,36 @@ def summary(log_path: str):
         click.echo("\n⚠️  WARNING: >85% of rollout steps hit max reward ceiling! Possible reward shortcut.", err=True)
 
 
+@main.command(name="ui")
+@click.argument("path", type=click.Path(exists=True), default=".")
+@click.option("--port", "-p", type=int, default=8500, help="Port to run the UI server on (default: 8500).")
+def ui_cmd(path: str, port: int):
+    """Launch the interactive web dashboard UI in your browser."""
+    from ratctl.ui import launch_dashboard
+
+    launch_dashboard(path=path, port=port)
+
+
+@main.command(name="dashboard")
+@click.argument("path", type=click.Path(exists=True), default=".")
+@click.option("--port", "-p", type=int, default=8500, help="Port to run the UI server on (default: 8500).")
+def dashboard_cmd(path: str, port: int):
+    """Launch the interactive web dashboard UI in your browser (alias for ratctl ui)."""
+    from ratctl.ui import launch_dashboard
+
+    launch_dashboard(path=path, port=port)
+
+
+@main.command(name="tui")
+@click.argument("log_path", type=click.Path(), default="logs/run.jsonl")
+@click.option("--no-live", is_flag=True, help="Render a single frame snapshot without full-screen live updates.")
+def tui_cmd(log_path: str, no_live: bool):
+    """Launch the live interactive Terminal UI (TUI) dashboard."""
+    from ratctl.tui import run_tui
+
+    run_tui(log_path=log_path, live_mode=not no_live)
+
+
 
 def _parse_threshold(fail_on: str) -> float | None:
     """Parse a --fail-on expression like 'gameability>0.3'."""
