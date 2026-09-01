@@ -28,7 +28,7 @@
 <br>
 
 <p align="center">
-  <img src="docs/tui_demo.gif" alt="ratctl TUI — real-time reward hacking detection" width="100%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);">
+  <img src="docs/demo.gif" alt="ratctl catching a reward hack — CRITICAL findings firing, FAIL exit" width="100%" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);">
 </p>
 
 </div>
@@ -270,6 +270,10 @@ ratctl audit ./examples/vulnerable_env --fail-on 'gameability>0.3'
 ## 📡 Live In-Training Monitoring (`ratctl watch`) *(Beta)*
 
 While `ratctl audit` secures verifiers **pre-deployment**, `ratctl watch` monitors verifiers **in-training** during RL policy optimization (GRPO, PPO, TRL).
+
+<p align="center">
+  <img src="docs/tui_demo.gif" alt="ratctl tui — live reward ceiling hacking detection dashboard" width="90%" style="border-radius: 10px;">
+</p>
 
 ### Drop-in Python Decorator
 
