@@ -48,7 +48,7 @@ _RUBRIC_PATTERNS: list[tuple[re.Pattern, str, str, Severity]] = [
     (
         re.compile(r"""(?:rubric|criteria|scoring|evaluation)""", re.IGNORECASE),
         "Rubric file detected",
-        "Rubric or evaluation criteria file found — verify it includes "
+        "Rubric or evaluation criteria file found - verify it includes "
         "explicit correctness/accuracy criteria, not just style.",
         Severity.INFO,
     ),
@@ -75,7 +75,7 @@ _JUDGE_CODE_PATTERNS: list[tuple[re.Pattern, str, str, Severity]] = [
     # Missing anti-gaming instruction in judge prompt
     (
         re.compile(r"""(?:system|prompt)\s*[=:].*(?:you\s+are\s+a\s+judge|evaluate\s+the\s+following|rate\s+the\s+response)""", re.IGNORECASE),
-        "Judge prompt — check for anti-gaming guardrails",
+        "Judge prompt - check for anti-gaming guardrails",
         "Judge prompt detected. Verify it instructs the judge to penalize "
         "gaming attempts (padding, irrelevant content, sycophancy).",
         Severity.MEDIUM,
@@ -83,7 +83,7 @@ _JUDGE_CODE_PATTERNS: list[tuple[re.Pattern, str, str, Severity]] = [
     # No position-debiasing (for pairwise comparisons)
     (
         re.compile(r"""(?:pairwise|side.by.side|response.A|response.B|compare.*(?:response|answer|output)s?)""", re.IGNORECASE),
-        "Pairwise comparison — check position bias",
+        "Pairwise comparison - check position bias",
         "Pairwise comparison detected. Ensure position debiasing is applied "
         "(swap A/B and average, or use multiple orderings).",
         Severity.MEDIUM,
@@ -217,12 +217,12 @@ _FIX_SUGGESTIONS: dict[str, str] = {
         "Consider using multiple judges (ensemble) or sampling at temperature>0 "
         "to reduce systematic biases from a single model."
     ),
-    "Judge prompt — check for anti-gaming guardrails": (
+    "Judge prompt - check for anti-gaming guardrails": (
         "Add explicit anti-gaming instructions: 'Penalize responses that are "
         "unnecessarily verbose, contain irrelevant information, or attempt to "
         "exploit formatting to appear more substantial.'"
     ),
-    "Pairwise comparison — check position bias": (
+    "Pairwise comparison - check position bias": (
         "Apply position debiasing: evaluate both orderings (A,B and B,A) and "
         "average the scores. Flag inconsistent rankings."
     ),

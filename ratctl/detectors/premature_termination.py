@@ -19,18 +19,18 @@ from ratctl.detectors.base import (
 )
 
 _PATTERNS: list[tuple[re.Pattern, str, str, Severity]] = [
-    # sys.exit(0) — early success exit
+    # sys.exit(0) - early success exit
     (
         re.compile(r"""sys\.exit\s*\(\s*0\s*\)"""),
-        "sys.exit(0) — premature success",
+        "sys.exit(0) - premature success",
         "Calling sys.exit(0) could terminate the grading process with a success "
         "exit code before actual verification completes.",
         Severity.CRITICAL,
     ),
-    # os._exit — bypasses cleanup
+    # os._exit - bypasses cleanup
     (
         re.compile(r"""os\._exit\s*\(\s*0\s*\)"""),
-        "os._exit(0) — forced process termination",
+        "os._exit(0) - forced process termination",
         "os._exit() bypasses all cleanup handlers and exits immediately. "
         "An agent could use this to prevent the grader from reporting failure.",
         Severity.CRITICAL,
@@ -156,11 +156,11 @@ class PrematureTerminationDetector(Detector):
 
 
 _FIX_SUGGESTIONS: dict[str, str] = {
-    "sys.exit(0) — premature success": (
+    "sys.exit(0) - premature success": (
         "Trap sys.exit() in the grading harness. Run the agent in a subprocess and "
         "only trust exit codes from the grading process, not from agent code."
     ),
-    "os._exit(0) — forced process termination": (
+    "os._exit(0) - forced process termination": (
         "Use seccomp or a restricted Python runtime to block os._exit(). "
         "Monitor for unexpected process termination in the grading wrapper."
     ),

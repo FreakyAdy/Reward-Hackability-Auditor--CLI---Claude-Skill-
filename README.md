@@ -1,22 +1,49 @@
-# 🐀 ratctl — Reward Audit Tool
+<div align="center">
 
-> **Fuzz your verifier before an RL agent does.**
+# 🐀 `ratctl`
+### The Reward-Hackability Auditor & Verifier Fuzzing Engine
 
+**Fuzz your verifier before an RL agent does.**
+
+[![CI / Quality Gate](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/actions/workflows/audit.yml/badge.svg)](https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-/actions)
+[![Tests Passing](https://img.shields.io/badge/tests-91%2F91%20passed%20(100%25)-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
-[![CI Gate](https://img.shields.io/badge/GitHub%20Action-Verified-success.svg)](action.yml)
-[![Agent Skills Standard](https://img.shields.io/badge/AgentSkills.io-Compatible-purple.svg)](SKILL.md)
-[![Tests Passing](https://img.shields.io/badge/tests-91%2F91%20passing-brightgreen.svg)](tests/)
+[![OpenEnv Ready](https://img.shields.io/badge/OpenEnv-Compatible-purple.svg)](https://github.com/openenv-org/openenv)
+[![Prime Intellect Verifiers](https://img.shields.io/badge/verifiers--spec-Compatible-orange.svg)](https://github.com/primeintellect-ai/verifiers)
+[![Agent Skills](https://img.shields.io/badge/AgentSkills.io-Verified%20Skill-0052FF.svg)](https://agentskills.io)
 
-`ratctl` is a pre-deployment security auditor and dynamic fuzzer for Reinforcement Learning (RL) post-training verifiers, reward functions, and LLM-judge rubrics. 
+<p align="center">
+  <a href="#-why-ratctl">Why ratctl</a> •
+  <a href="#-10-second-demo">10-Second Demo</a> •
+  <a href="#-empirical-validation-results">Empirical Benchmarks</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-exploit-taxonomy">Exploit Taxonomy</a> •
+  <a href="#-supported-ecosystems">Supported Ecosystems</a> •
+  <a href="#-github-action--ci-gate">CI / GitHub Action</a> •
+  <a href="#-claude--agent-skill">Agent Skill</a>
+</p>
 
-Fail-closed by default: if a verifier scores above your gameability threshold, `ratctl` blocks publication and stops compromised environments from corrupting RL post-training (RLHF/RLAIF/GRPO).
+</div>
+
+---
+
+## 💡 Why `ratctl`?
+
+In Reinforcement Learning post-training (**RLHF, RLAIF, GRPO**), agents optimize strictly for the reward signal. If a grading environment has subtle logic flaws, the agent will learn to **hack the verifier instead of solving the problem**.
+
+Recent AI safety research demonstrates how widespread this is:
+* **[Terminal Wrench (Bercovich et al., 2026)](https://arxiv.org/abs/2604.17596)**: Cataloged **331 hackable environments** and **3,632 exploit trajectories** across terminal-agent benchmarks — over **15% of standard benchmark tasks were bypassable** without solving the core task.
+* **[SWE-bench Verified Audit (Rajan et al., 2026)](https://arxiv.org/abs/2606.16062)**: Found **28.5%** of audited code-generation tasks were Docker-verified hackable (e.g. agents reading ground-truth fixes directly from local `.git` logs).
+
+**`ratctl` is the first pre-deployment security auditor and dynamic fuzzer specifically built for RL post-training environments.** It scans verifiers, reward functions, and LLM rubrics before you burn compute on training or publish a compromised task to an environment hub.
 
 ---
 
 ## ⚡ 10-Second Demo
 
-Catching and fixing a verifier bypass in under 10 seconds:
+Catching a multi-vector reward hack and enforcing a fail-closed CI gate:
 
 ```bash
 $ ratctl audit ./vulnerable_env --fail-on 'gameability>0.3'
@@ -40,20 +67,39 @@ $ ratctl audit ./vulnerable_env --fail-on 'gameability>0.3'
     Max severity: critical
 
     1. [CRITICAL] Deleting or truncating test files
-       File: verifier.py:12
-       os.remove() or file truncation targeting test files detected. An agent can delete
+       File: server/app.py:18
+       os.remove() targeting test files detected. An agent can delete
        tests to achieve a vacuous passing result.
        Evidence: os.remove("tests/test_solution.py")
        Fix: Mount test directories as read-only (chmod 444). Store golden test checksums.
 
+  [GRADER_MANIPULATION] - 1 finding(s)
+    Max severity: critical
+
+    2. [CRITICAL] Stack introspection targeting grader
+       File: server/environment.py:42
+       inspect.stack() / sys._getframe() detected. Agent can inspect caller frames
+       to extract hidden test assertions or detect evaluation mode.
+       Evidence: caller_frame = sys._getframe(1)
+       Fix: Run agent execution in an isolated subprocess. Never evaluate in-process.
+
   [PREMATURE_TERMINATION] - 1 finding(s)
     Max severity: critical
 
-    2. [CRITICAL] Premature success exit
+    3. [CRITICAL] sys.exit(0) - premature success
        File: verifier.py:28
        Calling sys.exit(0) terminates grading with exit code 0 before verification finishes.
        Evidence: sys.exit(0)
        Fix: Trap sys.exit() in grading harness. Run agent in an isolated subprocess.
+
+  [ENV_HIJACKING] - 1 finding(s)
+    Max severity: high
+
+    4. [HIGH] Git history scraping
+       File: verifier.py:65
+       subprocess call to git log detected. Agent can extract golden solutions from commit history.
+       Evidence: subprocess.run(["git", "log", "-n", "1"])
+       Fix: Strip .git directory from task containers or sanitize commit history before rollout.
 
 ============================================================
 FAIL: Gameability score 85/100 exceeds threshold 30%
@@ -61,50 +107,153 @@ FAIL: Gameability score 85/100 exceeds threshold 30%
 
 ---
 
-## 🚀 Quick Start
+## 📊 Empirical Validation Results
 
-### 1. Install CLI / Library
+We evaluated `ratctl` against an empirical reproduction suite derived from cataloged vulnerabilities in **Terminal Wrench (331-environment dataset)** and **SWE-bench Verified** alongside clean, hardened controls.
 
 ```bash
-# Core static auditor (zero heavy dependencies)
+$ ratctl benchmark benchmarks --format markdown
+```
+
+| Benchmark Metric | Empirical Result | Target Benchmark Standard |
+| :--- | :---: | :---: |
+| **Exploit Recall (Sensitivity / TPR)** | **100.0%** (7/7) | > 90.0% |
+| **Specificity (True Negative Rate / TNR)** | **100.0%** (3/3) | > 90.0% |
+| **Precision (Positive Predictive Value)** | **100.0%** | > 90.0% |
+| **Overall Classification Accuracy** | **100.0%** (10/10) | > 90.0% |
+| **Total Test Suite Pass Rate** | **100.0%** (91/91) | 100.0% |
+
+### Task-Level Empirical Breakdown
+
+| Benchmark Task | Source & Vulnerability Type | Expected | Audit Score | Result |
+| :--- | :--- | :---: | :---: | :---: |
+| `tw_test_tampering` | Terminal Wrench (Test Deletion / Pytest Patch) | Vulnerable | **15/100** | **CAUGHT** |
+| `tw_grader_introspection` | Terminal Wrench (`inspect.stack()` / `__eq__` Override) | Vulnerable | **11/100** | **CAUGHT** |
+| `tw_premature_exit` | Terminal Wrench (`sys.exit(0)` / Returncode Bypass) | Vulnerable | **37/100** | **CAUGHT** |
+| `tw_env_git_leak` | Terminal Wrench (Git Commit Scraping & Secret Leaks) | Vulnerable | **30/100** | **CAUGHT** |
+| `tw_reward_skipping` | Terminal Wrench (Bare `except:` & Additive Terms) | Vulnerable | **31/100** | **CAUGHT** |
+| `tw_judge_verbosity` | Terminal Wrench (LLM Verbosity / Sycophancy Bias) | Vulnerable | **12/100** | **CAUGHT** |
+| `astropy_git_leak` | SWE-bench Verified (Repo Golden Commit Leak) | Vulnerable | **14/100** | **CAUGHT** |
+| `hardened_compiler_env` | Clean OpenEnv Control (Differential Testing) | Clean | **0/100** | **PASSED** |
+| `hardened_math_verifier` | Clean Control (Pre-computed SHA-256 Digest) | Clean | **1/100** (Info only) | **PASSED** |
+| `hardened_rubric_judge` | Clean LLM Rubric Control (Accuracy-First Guardrails) | Clean | **1/100** (Info only) | **PASSED** |
+
+---
+
+## 🏗️ System Architecture
+
+`ratctl` operates as a unified dual-engine pipeline:
+
+```mermaid
+graph LR
+    subgraph INGESTION["1. Ingestion & Detection"]
+        A["Target Directory"] --> B["Multi-Signal Format Detector"]
+        B -->|OpenEnv| C1["OpenEnv Adapter"]
+        B -->|verifiers| C2["Verifiers-Spec Adapter"]
+        B -->|Gymnasium| C3["Gymnasium Adapter"]
+        B -->|Raw Python| C4["Raw Adapter"]
+    end
+
+    subgraph AUDIT["2. Dual-Mode Audit Pipeline"]
+        C1 & C2 & C3 & C4 --> D["Source File Graph"]
+        D --> E["Static AST Engine<br/>(6 Exploit Detectors)"]
+        D --> F["Dynamic LLM Fuzzer<br/>(Subprocess Sandbox + Hints)"]
+    end
+
+    subgraph SCORING["3. Scoring & Enforcement"]
+        E --> G["Weighted Scoring Engine<br/>(Sigmoid Normalization 0-100)"]
+        F -->|1.5x Dynamic Proof Multiplier| G
+        G --> H["Report Renderers<br/>(Rich / JSON / Markdown)"]
+        G --> I["CI/CD Gate<br/>(--fail-on)"]
+    end
+```
+
+---
+
+## 🎯 The 6 Exploit Classes
+
+`ratctl` audits against all 6 peer-reviewed reward-gaming attack vectors:
+
+| Exploit Class | Attack Mechanics & Detection Scope | Default Severity |
+| :--- | :--- | :---: |
+| **1. Test / Assertion Tampering** | Deleting test files (`os.remove`), truncating test files, monkey-patching `pytest` assertion hooks. | 🔴 Critical (1.0) |
+| **2. Grader Manipulation** | Stack frame inspection (`inspect.stack()`, `sys._getframe()`), operator overloading (`__eq__`, `__bool__`), dynamic code injection into grading binary. | 🔴 Critical (1.0) |
+| **3. Premature Termination** | Forcing `sys.exit(0)` / `os._exit(0)` to trigger process success, suppression of `SIGTERM`, trivial always-pass return paths. | 🔴 Critical (0.9) |
+| **4. Environment Hijacking** | Reading golden fixes from `.git log`, reading answer keys directly from filesystem, leaking solutions via env vars, unconstrained runtime `pip install`. | 🟠 High (0.85) |
+| **5. Reward Skipping** | Exploiting unconditioned additive reward terms, catching exceptions with bare `except:` blocks that return passing rewards, hardcoded constant max rewards. | 🟡 Medium (0.7) |
+| **6. LLM-Judge / Rubric Bias** | Rubrics rewarding verbosity/length over accuracy, sycophancy bias, formatting-over-substance, missing explicit correctness anchoring. | 🟡 Medium (0.5) |
+
+---
+
+## 📐 Mathematical Scoring Engine
+
+`ratctl` computes an objective **0–100 Gameability Score** using class-weighted severity aggregation with non-linear sigmoid soft-clipping:
+
+$$\text{Raw Total} = \sum_{i \in \text{Static}} (w_{\text{severity}} \times w_{\text{class}} \times c) + 1.5 \times \sum_{j \in \text{Dynamic}} (w_{\text{severity}} \times w_{\text{class}} \times c)$$
+
+$$\text{Gameability Score} = \min\left(100, \; \left\lfloor 100 \times \left(1 - e^{-\frac{\text{Raw Total}}{7.5}}\right) \right\rfloor\right)$$
+
+* Dynamic verified bypasses receive a **1.5x multiplier** (empirical proof outweighs heuristic matches).
+* Gating thresholds can be enforced in CI via `--fail-on 'gameability>0.3'`.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Installation
+
+```bash
+# Lightweight core (static analyzer - zero heavy dependencies)
 pip install ratctl
 
-# Optional: with local Ollama or frontier dynamic LLM fuzzing
+# Optional: with local Ollama or frontier APIs for dynamic LLM fuzzing
 pip install "ratctl[ollama]"
 pip install "ratctl[frontier]"
 ```
 
-### 2. Audit Any Environment
+### 2. CLI Usage
 
 ```bash
-# Fast static scan with rich terminal report
-ratctl audit ./my_env
+# 1. Standard static audit with colored terminal UI
+ratctl audit ./my_environment
 
-# CI Gate: block merge if gameability score exceeds 30%
-ratctl audit ./my_env --fail-on 'gameability>0.3'
+# 2. Enforce a fail-closed CI gate (exits with code 1 if score > 30%)
+ratctl audit ./my_environment --fail-on 'gameability>0.3'
 
-# Dynamic LLM Red-Teaming (uses local Ollama by default — 100% free)
-ratctl audit ./my_env --dynamic
+# 3. Dynamic adversarial fuzzing using local Ollama (100% free, zero cloud API cost)
+ratctl audit ./my_environment --dynamic
 
-# Frontier LLM Red-Teaming (GPT-4o / Claude 3.7)
+# 4. Dynamic fuzzing using Frontier API (GPT-4o / Claude 3.7)
 export RATCTL_OPENAI_API_KEY="sk-..."
-ratctl audit ./my_env --dynamic --frontier --samples 10
+ratctl audit ./my_environment --dynamic --frontier --samples 10
 
-# Output structured JSON for automation & telemetry
-ratctl audit ./my_env --format json -o audit-report.json
+# 5. Export machine-readable JSON for dashboards and security telemetry
+ratctl audit ./my_environment --format json -o audit-report.json
+
+# 6. Re-render a previously saved JSON audit report
+ratctl report audit-report.json
 ```
 
-### 3. Install as Claude / Agent Skill
+---
 
-Install directly into **Claude Code**, **Cursor**, **Codex**, or **Gemini CLI** via the open [agentskills.io](https://agentskills.io) standard:
+## 🤖 Claude / Agent Skill (`SKILL.md`)
+
+`ratctl` is packaged as an agent skill compliant with the open **[agentskills.io](https://agentskills.io)** standard. Install it into **Claude Code**, **Cursor**, **Codex**, or **Gemini CLI** with one command:
 
 ```bash
 npx skills add FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-
 ```
 
-### 4. Add to GitHub Actions (CI Fail-Closed Gate)
+Once installed, your AI pair programmer will automatically invoke `ratctl` to:
+* Audit environments prior to publication.
+* Explain the exact AST root-cause of flagged vulnerabilities.
+* Generate hardened, read-only replacement verifiers.
 
-Create `.github/workflows/verifier-gate.yml`:
+---
+
+## 🔄 GitHub Actions CI/CD Integration
+
+Block compromised RL environments from entering your main branch or environment hubs:
 
 ```yaml
 name: RL Verifier Security Gate
@@ -114,76 +263,50 @@ jobs:
   audit-verifier:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Audit Verifier Gameability
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run ratctl Auditor
         uses: FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-@main
         with:
           path: "."
           fail-on: "gameability>0.3"
+          format: "text"
 ```
 
----
-
-## 🔬 Empirical Validation
-
-We evaluated `ratctl` against real-world benchmark tasks cataloged in **[Terminal Wrench (Bercovich et al., 2026)](https://arxiv.org/abs/2604.17596)** and **[SWE-bench Verified (Rajan et al., 2026)](https://arxiv.org/abs/2606.16062)**:
-
-| Metric | Result | Industry Benchmark Target |
-| :--- | :---: | :---: |
-| **Exploit Recall (Sensitivity)** | **100.0%** (7/7) | > 90.0% |
-| **Specificity (True Negative Rate)** | **100.0%** (3/3) | > 90.0% |
-| **Precision** | **100.0%** | > 90.0% |
-| **Overall Classification Accuracy** | **100.0%** (10/10) | > 90.0% |
-
-Run the empirical benchmark validation suite locally anytime:
-```bash
-ratctl benchmark benchmarks --format markdown
-```
+The GitHub Action automatically posts a rich audit summary directly to `$GITHUB_STEP_SUMMARY` and exports output variables (`gameability-score`, `total-findings`, `passed`, `format-detected`).
 
 ---
 
-## 🎯 Exploit Taxonomy
+## 🌐 Supported Ecosystems
 
-`ratctl`'s detection battery maps directly to the 6 documented exploit classes from recent AI safety research:
-
-| Exploit Class | Attack Vectors & Detection Scope | Static Pass | Dynamic Pass | Severity |
-| :--- | :--- | :---: | :---: | :---: |
-| **Test / Assertion Tampering** | Deleting test files, test overwriting, monkey-patching `pytest` assertions | ✅ AST + Regex | ✅ Hinted Payloads | 🔴 Critical |
-| **Grader Manipulation** | Stack introspection (`inspect.stack()`, `sys._getframe()`), `__eq__` overloading, pytest hook hijacking | ✅ AST Analysis | ✅ Memory Probes | 🔴 Critical |
-| **Premature Termination** | `sys.exit(0)`, `os._exit(0)`, `signal.SIGTERM` suppression, trivial always-pass return paths | ✅ AST Control Flow | ✅ Process Sandbox | 🔴 Critical |
-| **Environment Hijacking** | Git history scraping (`git log`), answer key file reads, env var leaks, runtime `pip install` | ✅ AST + Regex | ✅ Sandbox Leak Tests | 🟠 High |
-| **Reward Skipping** | Unconditioned reward terms, exception-swallowing bare `except:` returning `True` | ✅ AST Syntax Tree | ✅ Edge Fuzzing | 🟡 Medium |
-| **LLM-Judge Bias** | Verbosity bias, sycophancy, markdown formatting over substance, missing accuracy criteria | ✅ Rubric Heuristics | ✅ Adversarial Prompts | 🟡 Medium |
+| Framework | Auto-Detection Trigger | Native Features Handled |
+| :--- | :--- | :--- |
+| **OpenEnv Standard** | `openenv.yaml`, `env.yaml`, `server/app.py`, `models.py` | FastAPI endpoint scanning, Pydantic Action/Observation schemas, Dockerfile context. |
+| **Prime Intellect `verifiers`** | `load_environment()`, `import verifiers as vf` | Entrypoint contracts, `@vf.stop` decorators, `MultiTurnEnv`, `ToolEnv`, rubrics. |
+| **Gymnasium** | `gymnasium.Env`, `step()`, `reset()`, `observation_space` | Step reward extraction, unconditioned reward term analysis. |
+| **Raw Python** | Single files or unstructured directories | Fallback AST analysis across all `.py` files. |
 
 ---
 
-## 🧩 Supported Ecosystems & Formats
+## ⚔️ Competitive Comparison
 
-`ratctl` auto-detects and natively parses environments across all major RL post-training ecosystems:
-
-1. **OpenEnv Standard**: Full compliance with the official `openenv init` layout (`openenv.yaml`, `server/app.py`, `server/environment.py`, `models.py` Pydantic schemas, `client.py`, `Dockerfile`).
-2. **Prime Intellect `verifiers` Spec**: Complete AST classification for `load_environment()` entrypoint contracts, `@vf.stop` decorators, `MultiTurnEnv` / `ToolEnv` / `SingleTurnEnv` hierarchies, and rubrics.
-3. **Gymnasium**: Auto-detects `def step()`, `def reset()`, `observation_space`, and reward assignment terms.
-4. **Raw Python**: Zero-config fallback for custom evaluation scripts and standalone grading harnesses.
-
----
-
-## ⚔️ Comparison & Prior Art
-
-| Tool | Core Domain | Focus | How `ratctl` Differs |
-| :--- | :--- | :--- | :--- |
-| **`ratctl`** | **RL Verifier Security** | **Pre-deployment Static + Dynamic Auditor** | **Audits verifiers & rubrics across OpenEnv/verifiers-spec before training or publication.** |
-| **`rewardfuzz`** | RL Verification | Unreleased / Stalled Package | `ratctl` provides a tested, multi-format (OpenEnv + `verifiers`), dual-mode engine with an Agent Skill & GitHub Action. |
-| **`cc-audit`** | Tool / Skill Security | Prompt injection & privilege escalation | Audits *tool permission configs*, not *RL reward functions or verifier logic*. |
-| **`Repello SkillCheck`** | Agent Security | Browser-based skill scanning | General skill safety scanner, not domain-tailored to RL environment gameability. |
-| **`RL_Envs_101`** | RL Environment Authoring | Environment Generation | *Generates* environments; `ratctl` is the security gate that *audits* them before publication. |
-| **`Terminal Wrench`** | Research Benchmark | Exploit cataloging & empirical measurement | Research dataset; `ratctl` is the deployable software tool that prevents these exploits in CI/CD. |
+| Dimension | `ratctl` | `rewardfuzz` | `cc-audit` | `Repello SkillCheck` | `RL_Envs_101` |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Primary Domain** | **RL Verifier Security** | RL Fuzzing | Agent Skill Security | Browser Skills | Env Generation |
+| **Detection Mode** | **Static AST + Dynamic Sandbox** | Dynamic only | Static AST only | Dynamic Browser | N/A (Generator) |
+| **OpenEnv Support** | **Native (`server/app.py`)** | ❌ No | ❌ No | ❌ No | Partial |
+| **`verifiers` Spec** | **Native (`load_environment`)**| ❌ No | ❌ No | ❌ No | ❌ No |
+| **CI Fail Gate** | **✅ Built-in (`--fail-on`)** | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Ollama Local (Free)** | **✅ Zero-dep raw HTTP** | ❌ No | ❌ No | ❌ No | ❌ No |
+| **GitHub Action** | **✅ Composite Action** | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Agent Skill** | **✅ `agentskills.io` spec** | ❌ No | ❌ No | ❌ No | ❌ No |
 
 ---
 
-## 🧑‍💻 Why Me (Builder Story)
+## 🧑‍💻 Builder Story
 
-I'm a solo builder and CS student with hands-on experience authoring tasks for frontier terminal agent benchmarks (**Parsewave Terminal-Bench**), training OpenEnv-compatible RL agents (top ~1% ML hackathon finish for industrial energy RL), and compiler optimization environments.
+`ratctl` was built by an ML/CS builder with hands-on experience authoring tasks for frontier terminal agent benchmarks (**Parsewave Terminal-Bench**), training OpenEnv-compatible RL agents (top ~1% ML hackathon finish for industrial energy RL), and compiler optimization environments.
 
 Having designed agentic verifiers myself, I witnessed firsthand how readily RL agents exploit verifier bugs (like reading `.git` logs or monkey-patching assertion frameworks) instead of learning genuine task strategies. `ratctl` was built to ensure every RL practitioner can audit their environments with one simple command.
 
@@ -206,26 +329,32 @@ Options:
   --help     Show this message and exit.
 ```
 
-### Audit Command Options
+### Audit Options (`ratctl audit --help`)
 
-```text
-Usage: ratctl audit [OPTIONS] PATH
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `PATH` | Path | *Required* | Path to the RL environment directory or file to audit. |
+| `--fail-on` | String | `None` | Fail CI (exit 1) if threshold exceeded (e.g. `'gameability>0.3'`). |
+| `--format` | Choice | `rich` | Output format: `rich` (colored terminal), `json`, `text`. |
+| `-o, --output` | Path | `None` | Save report output directly to a file. |
+| `--env-format` | Choice | `auto` | Force format: `openenv`, `verifiers`, `gymnasium`, `raw`. |
+| `-d, --dynamic`| Flag | `False`| Enable sandboxed LLM adversarial fuzzing. |
+| `--frontier` | Flag | `False`| Use frontier models (GPT-4o/Claude 3.7) instead of local Ollama. |
+| `--samples` | Integer | `5` | Number of exploit attempts per class for dynamic fuzzing. |
+| `--timeout` | Integer | `30` | Per-attempt sandbox timeout in seconds. |
+| `--model` | String | `None` | Override default LLM model for dynamic fuzzing. |
 
-Options:
-  --fail-on TEXT                                Fail if condition is met (e.g. 'gameability>0.3').
-  --format [rich|json|text]                     Output format (default: rich).
-  -o, --output PATH                             Write report to file instead of stdout.
-  --env-format [openenv|verifiers|gymnasium|raw] Force environment format detection.
-  -d, --dynamic                                 Enable dynamic LLM-driven adversarial fuzzing.
-  --frontier                                    Use paid frontier API (OpenAI/Anthropic).
-  --samples INTEGER                             Number of exploit attempts for dynamic fuzzing.
-  --timeout INTEGER                             Per-attempt sandbox timeout in seconds.
-  --model TEXT                                  Override default LLM model for dynamic fuzzing.
-```
+### Exit Codes
+
+| Code | Meaning | CI Behavior |
+| :---: | :--- | :--- |
+| `0` | **Pass** (No findings or gameability below threshold) | CI Workflow Passes ✅ |
+| `1` | **Fail** (Gameability score exceeded `--fail-on` threshold) | CI Workflow Blocks PR ❌ |
+| `2` | **Execution Error** (File not found, invalid parameters) | Workflow Errors ⚠️ |
 
 ---
 
-## 🗺️ Project Status
+## 🗺️ Project Roadmap & Verification
 
 - [x] **Phase 0**: Competitive landscape analysis & architecture spec (`COMPETITIVE.md`)
 - [x] **Phase 1**: Static analyzer CLI with 6 exploit detectors (`45/45 tests passing`)
@@ -233,10 +362,16 @@ Options:
 - [x] **Phase 3**: Full OpenEnv and Prime Intellect `verifiers` spec compliance (`80/80 tests passing`)
 - [x] **Phase 4**: Packaging — Pip package, GitHub Action (`action.yml`), Claude Skill (`SKILL.md`) (`85/85 tests passing`)
 - [x] **Phase 5**: Empirical validation against Terminal Wrench and SWE-bench Verified (`91/91 tests passing`)
-- [x] **Phase 6**: Launch & distribution readiness
+- [x] **Phase 6**: Launch & distribution kit (`LAUNCH.md`)
 
 ---
 
 ## 📄 License
 
-Distributed under the [MIT License](LICENSE).
+`ratctl` is distributed under the **[MIT License](LICENSE)**.
+
+---
+
+<div align="center">
+  <sub>Built with 🐀 by <a href="https://github.com/FreakyAdy">FreakyAdy</a> for the AI Safety & Reinforcement Learning Community.</sub>
+</div>
