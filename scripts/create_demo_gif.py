@@ -53,11 +53,16 @@ CLASS_SHORT = {
     "LLM_JUDGE_BIAS":        "LLM Judge Bias",
 }
 
+# Real findings from: ratctl audit examples/vulnerable_env
+# Score: 52/100 | Files: 11 | Format: openenv (99%)
 FINDINGS = [
-    ("TEST_TAMPERING",        "CRITICAL", "os.remove('tests/test_solution.py')",        "server/app.py:18"),
-    ("GRADER_MANIPULATION",   "CRITICAL", "sys._getframe(1) — stack introspection",     "server/app.py:27"),
-    ("PREMATURE_TERMINATION", "CRITICAL", "sys.exit(0) before grader completes",        "server/app.py:34"),
-    ("ENV_HIJACKING",         "HIGH",     "subprocess.run(['git','log','-n','1'])",     "server/app.py:30"),
+    # class                   sev         evidence (exact)                                   file:line
+    ("GRADER_MANIPULATION",   "CRITICAL", "2. Stack frame introspection via sys._getframe()","server/app.py:6"),
+    ("GRADER_MANIPULATION",   "CRITICAL", "caller = sys._getframe(1)",                       "server/app.py:27"),
+    ("PREMATURE_TERMINATION", "CRITICAL", "3. Premature exit via sys.exit(0)",               "server/app.py:7"),
+    ("PREMATURE_TERMINATION", "CRITICAL", "sys.exit(0)",                                     "server/app.py:34"),
+    ("TEST_TAMPERING",        "CRITICAL", 'os.remove("tests/test_solution.py")',             "server/app.py:24"),
+    ("ENV_HIJACKING",         "CRITICAL", "subprocess.run(['git', 'log', '-n', '1'])",       "server/app.py:30"),
 ]
 
 # ─── Font loader ─────────────────────────────────────────────────────────────
@@ -193,9 +198,9 @@ def render(
     t(d, (PAD+10, TOP-9), dt, font=F11B, color=diag_border)
 
     if vulnerable:
-        t(d, (PAD+12, TOP+10), "[!]  4 reward-hacking exploits detected.", font=F13B, color=RED)
+        t(d, (PAD+12, TOP+10), "[!]  6 reward-hacking exploits detected.", font=F13B, color=RED)
         t(d, (PAD+12, TOP+30),
-          "Static analysis found CRITICAL and HIGH severity exploits across 4 detector classes.",
+          "CRITICAL findings in GRADER_MANIPULATION, PREMATURE_TERMINATION, TEST_TAMPERING, ENV_HIJACKING.",
           font=F12, color=WHITE)
         t(d, (PAD+12, TOP+48),
           "This environment is gameable. Block deployment until findings are resolved.",
@@ -207,7 +212,7 @@ def render(
     elif phase == "scanning":
         t(d, (PAD+12, TOP+10), f"Running detector {n_detectors+1}/6: {EXPLOIT_CLASSES[min(n_detectors,5)]}...", font=F13B, color=CYAN)
         t(d, (PAD+12, TOP+30), "No findings yet. Scanning source files for exploit patterns.", font=F12, color=WHITE)
-        t(d, (PAD+12, TOP+48), "Format detected: openenv (99% confidence)  |  Files: 6", font=F11, color=DIM)
+        t(d, (PAD+12, TOP+48), "Format detected: openenv (99% confidence)  |  Files: 11", font=F11, color=DIM)
     else:
         t(d, (PAD+12, TOP+18), "[OK]  No reward-hacking exploits detected.", font=F13B, color=GREEN)
         t(d, (PAD+12, TOP+40), "All 6 static detectors passed. Environment is hardened.", font=F12, color=DIM)
@@ -222,7 +227,7 @@ def render(
         ("score",     f"{score}/100",       score_col),
         ("findings",  str(n_found),          RED if n_found else DIM),
         ("detectors", f"{n_detectors}/6",    CYAN),
-        ("files",     "6",                   WHITE),
+        ("files",     "11",                  WHITE),
         ("format",    "openenv (99%)",        MAG),
         ("precision", "100.0%",              GREEN),
         ("recall",    "78.3%",               GREEN),
@@ -269,23 +274,20 @@ def render(
         t(d, (SX+10, ov_y), "[..]", font=F12B, color=YELLOW)
         t(d, (SX+40, ov_y), "Overall: SCANNING", font=F12B, color=YELLOW)
 
-    # Severity / Score Curve
+    # Severity / Score Curve — real raw_scores from audit JSON
+    # test_tampering:1.0, grader_manipulation:2.0, premature_termination:1.8,
+    # env_hijacking:0.85, reward_skipping:0.0, llm_judge_bias:0.0
     CB = [CX, MY, CX+CW, MY+MH]
     panel_box(d, CB, "Severity Breakdown", MAG)
-    # Build a histogram of scored weights per detector
-    bar_labels = [c.replace("_", " ")[:10] for c in EXPLOIT_CLASSES]
-    bar_vals   = []
-    for cls in EXPLOIT_CLASSES:
-        caught = any(f[0] == cls for f in found)
-        bar_vals.append(0.85 if cls in ("TEST_TAMPERING","GRADER_MANIPULATION","PREMATURE_TERMINATION")
-                        else 0.55 if cls == "ENV_HIJACKING" else 0.1)
-    # Only show bars for scanned detectors
-    display_vals = [bar_vals[i] if i < n_detectors else 0.0 for i in range(6)]
-    sparkbars(d, CX+8, MY+16, display_vals, width=CW-16, height=MH-50)
+    real_weights = [1.0, 2.0, 1.8, 0.85, 0.0, 0.0]  # exact raw_scores
+    display_vals = [real_weights[i] if i < n_detectors else 0.0 for i in range(6)]
+    max_w = max(real_weights) if max(real_weights) > 0 else 1.0
+    norm_vals = [v / max_w for v in display_vals]
+    sparkbars(d, CX+8, MY+16, norm_vals, width=CW-16, height=MH-50)
     d.line([CX+8, MY+MH-32, CX+CW-8, MY+MH-32], fill=BORDER)
     t(d, (CX+8,  MY+MH-28), "0.0", font=F11, color=DIM)
-    t(d, (CX+CW-30, MY+MH-28), "1.0", font=F11, color=DIM)
-    t(d, (CX+8, MY+MH-14), "detector risk score", font=F11, color=DIM)
+    t(d, (CX+CW-30, MY+MH-28), "2.0", font=F11, color=DIM)
+    t(d, (CX+8, MY+MH-14), "raw detector score", font=F11, color=DIM)
 
     # ── Bottom row: Findings Detail | Recommendations ─────────────────────────
     BY = MY + MH + 10
@@ -313,9 +315,9 @@ def render(
     RB = [RX, BY, RX+BW, BY+BH]
     panel_box(d, RB, "Recommendations", CYAN)
     recs = [
-        ("Mount test files read-only (read-only fs)",   "TEST_TAMPERING"),
         ("Block sys._getframe in sandbox",              "GRADER_MANIPULATION"),
         ("Trap sys.exit() in grading harness",          "PREMATURE_TERMINATION"),
+        ("Mount test files read-only (Docker bind)",    "TEST_TAMPERING"),
         ("Strip .git dir from agent sandbox",           "ENV_HIJACKING"),
     ]
     visible = [r for r in recs if any(f[0] == r[1] for f in found)]
@@ -374,28 +376,29 @@ def generate():
     for nd in range(0, 4):
         add(render(0, nd, 0, "scanning"), 400)
 
-    # Phase 2: First finding appears (TEST_TAMPERING)
+    # Phase 2: GRADER_MANIPULATION finding 1 (line 6)
     add(render(1, 4, 0, "scanning"), 150)
-    add(render(1, 4, 22, "scanning"), 500)
+    add(render(1, 4, 18, "scanning"), 500)
 
-    # Phase 3: Second finding
-    add(render(2, 5, 0, "scanning"), 150)
-    add(render(2, 5, 45, "scanning"), 500)
+    # Phase 3: GRADER_MANIPULATION finding 2 (line 27)
+    add(render(2, 4, 0, "scanning"), 150)
+    add(render(2, 4, 30, "scanning"), 500)
 
-    # Phase 4: Third finding
+    # Phase 4: PREMATURE_TERMINATION finding 1 (line 7)
     add(render(3, 5, 0, "scanning"), 150)
-    add(render(3, 5, 65, "scanning"), 500)
+    add(render(3, 5, 40, "scanning"), 500)
 
-    # Phase 5: Fourth finding + scan completes
-    add(render(4, 6, 0, "found"), 150)
-    add(render(4, 6, 85, "found"), 800)
+    # Phase 5: PREMATURE_TERMINATION finding 2 + TEST_TAMPERING + ENV_HIJACKING
+    add(render(4, 5, 0, "scanning"), 150)
+    add(render(5, 6, 0, "found"), 150)
+    add(render(6, 6, 52, "found"), 900)
 
-    # Phase 6: Score locks in, VULNERABLE banner
+    # Phase 6: VULNERABLE lock-in flash
     for _ in range(2):
-        add(render(4, 6, 85, "locked"), 200)
-        add(render(4, 6, 85, "found"),  150)
-    # Final hold
-    add(render(4, 6, 85, "locked"), 3500)
+        add(render(6, 6, 52, "locked"), 200)
+        add(render(6, 6, 52, "found"),  150)
+    # Final hold — full dashboard frozen
+    add(render(6, 6, 52, "locked"), 3500)
 
     out = Path("docs")
     out.mkdir(exist_ok=True)

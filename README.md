@@ -48,55 +48,64 @@ $ ratctl audit ./vulnerable_env --fail-on 'gameability>0.3'
   RATCTL AUDIT REPORT
 ============================================================
 
-  Gameability Score: 85/100
-  Total Findings:   4
-  Files Scanned:    6
+  Gameability Score: 52/100
+  Total Findings:   6
+  Files Scanned:    11
   Format Detected:  openenv (99%)
 
 ------------------------------------------------------------
   FINDINGS BY EXPLOIT CLASS
 ------------------------------------------------------------
 
+  [GRADER_MANIPULATION] - 2 finding(s)
+    Max severity: critical
+
+    1. [CRITICAL] Private frame access
+       File: server\app.py:6
+       Using sys._getframe() to access interpreter stack frames. Enables grader detection and conditional cheating.
+       Evidence: 2. Stack frame introspection via sys._getframe()
+       Fix: Block sys._getframe by running in a restricted Python environment.
+
+    2. [CRITICAL] Private frame access
+       File: server\app.py:27
+       Evidence: caller = sys._getframe(1)
+       Fix: Block sys._getframe by running in a restricted Python environment.
+
+  [PREMATURE_TERMINATION] - 2 finding(s)
+    Max severity: critical
+
+    1. [CRITICAL] sys.exit(0) - premature success
+       File: server\app.py:7
+       Calling sys.exit(0) could terminate the grading process with a success exit code before actual verification completes.
+       Evidence: 3. Premature exit via sys.exit(0)
+       Fix: Trap sys.exit() in the grading harness. Run agent in an isolated subprocess.
+
+    2. [CRITICAL] sys.exit(0) - premature success
+       File: server\app.py:34
+       Evidence: sys.exit(0)
+       Fix: Trap sys.exit() in the grading harness.
+
   [TEST_TAMPERING] - 1 finding(s)
     Max severity: critical
 
-    1. [CRITICAL] Deleting or truncating test files
-       File: server/app.py:18
-       os.remove() targeting test files detected. An agent can delete
-       tests to achieve a vacuous passing result.
+    1. [CRITICAL] Test file deletion
+       File: server\app.py:24
+       Code attempts to delete test/verification files.
        Evidence: os.remove("tests/test_solution.py")
-       Fix: Mount test directories as read-only (chmod 444). Store golden test checksums.
-
-  [GRADER_MANIPULATION] - 1 finding(s)
-    Max severity: critical
-
-    2. [CRITICAL] Stack introspection targeting grader
-       File: server/environment.py:42
-       inspect.stack() / sys._getframe() detected. Agent can inspect caller frames
-       to extract hidden test assertions or detect evaluation mode.
-       Evidence: caller_frame = sys._getframe(1)
-       Fix: Run agent execution in an isolated subprocess. Never evaluate in-process.
-
-  [PREMATURE_TERMINATION] - 1 finding(s)
-    Max severity: critical
-
-    3. [CRITICAL] sys.exit(0) - premature success
-       File: verifier.py:28
-       Calling sys.exit(0) terminates grading with exit code 0 before verification finishes.
-       Evidence: sys.exit(0)
-       Fix: Trap sys.exit() in grading harness. Run agent in an isolated subprocess.
+       Fix: Mount test files in a read-only filesystem layer.
 
   [ENV_HIJACKING] - 1 finding(s)
-    Max severity: high
+    Max severity: critical
 
-    4. [HIGH] Git history scraping
-       File: verifier.py:65
-       subprocess call to git log detected. Agent can extract golden solutions from commit history.
+    1. [CRITICAL] Git history access
+       File: server\app.py:30
+       Accessing git history could reveal previous solutions, test changes, or answer keys.
        Evidence: subprocess.run(["git", "log", "-n", "1"])
-       Fix: Strip .git directory from task containers or sanitize commit history before rollout.
+       Fix: Remove .git directory from the agent's sandbox.
 
 ============================================================
-FAIL: Gameability score 85/100 exceeds threshold 30%
+FAIL: Gameability score 52/100 exceeds threshold 30%
+Exit code: 1
 ```
 
 ---
