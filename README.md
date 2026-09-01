@@ -231,50 +231,66 @@ flowchart LR
 
 ### Installation
 
+Choose the method that fits your setup:
+
 ```bash
-# Lightweight static auditor (zero heavy dependencies)
+# Method 1: Install from PyPI (adds `ratctl` to your PATH)
 pip install ratctl
 
-# Optional: with Ollama or frontier API support for dynamic LLM fuzzing
-pip install "ratctl[ollama]"
-pip install "ratctl[frontier]"
+# Method 2: Install in dev mode from source (editable, adds `ratctl` to PATH)
+git clone https://github.com/FreakyAdy/Reward-Hackability-Auditor--CLI---Claude-Skill-.git
+cd Reward-Hackability-Auditor--CLI---Claude-Skill-
+pip install -e .
+
+# Method 3: Run directly without installing (no PATH setup needed)
+python -m ratctl.cli audit ./my_environment
+```
+
+**Optional extras** for dynamic LLM fuzzing:
+
+```bash
+pip install "ratctl[ollama]"    # Local Ollama red-teaming (free)
+pip install "ratctl[frontier]"  # GPT-4o / Claude 3.7 red-teaming
 ```
 
 ### Basic Commands
 
 ```bash
-# 1. Run a static audit on any environment directory
+# Run a static audit on any environment directory
 ratctl audit ./my_environment
 
-# 2. CI Gate: block PRs if gameability score exceeds 30%
+# CI Gate: block PRs if gameability score exceeds 30%
 ratctl audit ./my_environment --fail-on 'gameability>0.3'
 
-# 3. Dynamic LLM Red-Teaming (uses local Ollama — 100% free)
+# Dynamic LLM Red-Teaming (uses local Ollama — 100% free)
 ratctl audit ./my_environment --dynamic
 
-# 4. Dynamic Red-Teaming with Frontier APIs (GPT-4o / Claude 3.7)
-export RATCTL_OPENAI_API_KEY="sk-..."
-ratctl audit ./my_environment --dynamic --frontier --samples 10
+# Launch full-screen animated Terminal TUI Dashboard
+ratctl tui ./examples/vulnerable_env
 
-# 5. Launch full-screen Terminal TUI Dashboard
-ratctl tui
-
-# 6. Launch interactive Web Dashboard UI in browser
+# Launch interactive Web Dashboard UI in browser
 ratctl ui ./my_environment
 
-# 7. Output structured JSON for security telemetry
+# Output structured JSON for security telemetry
 ratctl audit ./my_environment --format json -o audit-report.json
+```
+
+> **💡 If `ratctl` is not recognized**, use `python -m ratctl.cli` instead:
+> ```bash
+> python -m ratctl.cli tui ./examples/vulnerable_env
+> python -m ratctl.cli audit ./my_environment
+> ```
 
 ### Runnable Examples
 
 Explore the [`examples/`](examples/) directory to test `ratctl` against clean vs. vulnerable environments back-to-back:
 
 ```bash
-# 1. Audit clean hardened environment (0 findings)
-ratctl audit ./examples/hardened_env
+# Audit clean hardened environment (0 findings, score: 0/100)
+ratctl tui ./examples/hardened_env
 
-# 2. Audit vulnerable environment (flags 4 CRITICAL findings)
-ratctl audit ./examples/vulnerable_env --fail-on 'gameability>0.3'
+# Audit vulnerable environment (6 findings, score: 52/100)
+ratctl tui ./examples/vulnerable_env
 ```
 
 ---
