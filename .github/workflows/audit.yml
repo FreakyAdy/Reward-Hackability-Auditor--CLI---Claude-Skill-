@@ -8,16 +8,30 @@ on:
   workflow_dispatch:
 
 jobs:
-  audit-verifier:
-    name: Audit RL Verifier
+  test-and-audit:
+    name: Test & Audit Hardened Controls
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Run ratctl Auditor
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies & Package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run Pytest Test Suite
+        run: |
+          pytest tests/ -v
+
+      - name: Run ratctl Audit on Hardened Control (Expect PASS)
         uses: ./
         with:
-          path: "."
+          path: "./examples/hardened_env"
           fail-on: "gameability>0.3"
           format: "text"
