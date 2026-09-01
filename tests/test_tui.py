@@ -8,6 +8,6 @@ def test_create_tui_layout():
     assert layout["header"] is not None
     assert layout["diagnosis"] is not None
     assert layout["middle"] is not None
-    assert layout["components_and_alerts"] is not None
-    assert layout["recent_rollouts"] is not None
+    assert layout["bottom"] is not None          # was components_and_alerts
+    assert layout["rollouts"] is not None        # was recent_rollouts
     assert layout["footer"] is not None
