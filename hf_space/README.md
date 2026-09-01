@@ -8,7 +8,7 @@ sdk_version: 4.44.0
 app_file: app.py
 pinned: false
 license: mit
-short_description: Fuzz and audit RL verifiers & reward functions for reward hacking.
+short_description: Audit RL verifiers & reward functions for exploits.
 ---
 
 # 🐀 ratctl Hugging Face Space

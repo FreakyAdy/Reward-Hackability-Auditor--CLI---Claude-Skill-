@@ -29,5 +29,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Reports
+# Reports & temporary uploads
 *.ratctl-report.json
+hf_repo/
+hf_upload/
