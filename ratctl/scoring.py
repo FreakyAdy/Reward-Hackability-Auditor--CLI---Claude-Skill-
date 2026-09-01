@@ -32,6 +32,8 @@ class AuditScore:
     total_findings: int = 0
     total_files_scanned: int = 0
     errors: list[str] = field(default_factory=list)
+    format_detected: str = "unknown"  # Detected format name
+    format_confidence: float = 0.0  # Detection confidence
 
     def exceeds_threshold(self, threshold: float) -> bool:
         """Check if the normalized score exceeds a threshold (0.0-1.0)."""

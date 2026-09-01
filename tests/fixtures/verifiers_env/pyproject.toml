@@ -1,0 +1,6 @@
+[project]
+name = "math-verifier-env"
+version = "0.1.0"
+dependencies = [
+    "verifiers>=1.0",
+]

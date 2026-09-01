@@ -1,7 +1,7 @@
-"""OpenEnv format adapter.
+"""OpenEnv format adapter — full compliance.
 
-Extracts verifier, reward, and test files from an OpenEnv-compliant
-environment directory structure.
+Supports both legacy flat-directory layouts and the modern OpenEnv CLI
+structure with server/, client.py, models.py, openenv.yaml, and Dockerfile.
 """
 
 from __future__ import annotations
@@ -17,12 +17,24 @@ from ratctl.formats.base import EnvironmentFormat, FormatAdapter
 class OpenEnvAdapter(FormatAdapter):
     """Adapter for OpenEnv-compliant RL environments.
 
-    Expected structure:
-        env.yaml (or openenv.yaml, env_config.yaml)
+    Supported structures:
+
+    Modern (openenv init):
+        openenv.yaml / env.yaml
+        client.py
+        models.py
+        server/
+            app.py
+            my_environment.py
+            Dockerfile
+            requirements.txt
+        pyproject.toml
+
+    Legacy / flat:
+        env.yaml / openenv.yaml / env_config.yaml
         verifier.py / verify.py / grader.py
         reward.py (optional)
         tests/ (optional)
-        solution/ (optional)
     """
 
     @property
@@ -31,77 +43,91 @@ class OpenEnvAdapter(FormatAdapter):
 
     def extract_sources(self, env_path: Path) -> list[SourceFile]:
         sources: list[SourceFile] = []
+        seen_paths: set[str] = set()
+
+        def _add(src: SourceFile | None) -> None:
+            if src and src.path not in seen_paths:
+                seen_paths.add(src.path)
+                sources.append(src)
 
         # 1. Read the config to discover file paths
         config = self._read_config(env_path)
 
-        # 2. Extract verifier/grader files
-        verifier_names = ["verifier.py", "verify.py", "grader.py", "grade.py", "check.py"]
-        if config and "verifier" in config:
-            verifier_names.insert(0, config["verifier"])
+        # 2. Extract config-specified files
+        if config:
+            for key in ("verifier", "grader", "checker"):
+                if key in config:
+                    _add(self._read_file(env_path / config[key], "verifier", env_path))
+            for key in ("reward", "reward_function"):
+                if key in config:
+                    _add(self._read_file(env_path / config[key], "reward", env_path))
 
+        # 3. Modern server/ directory (openenv init structure)
+        server_dir = env_path / "server"
+        if server_dir.is_dir():
+            for py_file in sorted(server_dir.rglob("*.py")):
+                name_lower = py_file.name.lower()
+                if name_lower == "app.py":
+                    _add(self._read_file(py_file, "verifier", env_path))
+                elif "environment" in name_lower or "env" in name_lower:
+                    _add(self._read_file(py_file, "reward", env_path))
+                elif name_lower == "__init__.py":
+                    _add(self._read_file(py_file, "unknown", env_path))
+                else:
+                    _add(self._read_file(py_file, "verifier", env_path))
+
+        # 4. models.py — Pydantic Action/Observation/State
+        _add(self._read_file(env_path / "models.py", "config", env_path))
+
+        # 5. client.py — client-side interface
+        _add(self._read_file(env_path / "client.py", "config", env_path))
+
+        # 6. Standard verifier/grader files
+        verifier_names = [
+            "verifier.py", "verify.py", "grader.py", "grade.py", "check.py",
+        ]
         for name in verifier_names:
-            vpath = env_path / name
-            if vpath.exists():
-                src = self._read_file(vpath, "verifier", env_path)
-                if src:
-                    sources.append(src)
+            _add(self._read_file(env_path / name, "verifier", env_path))
 
-        # 3. Extract reward files
+        # 7. Reward files
         reward_names = ["reward.py", "reward_function.py", "rewards.py"]
-        if config and "reward" in config:
-            reward_names.insert(0, config["reward"])
-
         for name in reward_names:
-            rpath = env_path / name
-            if rpath.exists():
-                src = self._read_file(rpath, "reward", env_path)
-                if src:
-                    sources.append(src)
+            _add(self._read_file(env_path / name, "reward", env_path))
 
-        # 4. Extract test files
-        test_dirs = [env_path / "tests", env_path / "test"]
-        for td in test_dirs:
-            sources.extend(self._collect_python_files(td, "test", env_path))
+        # 8. Test files
+        for td in (env_path / "tests", env_path / "test"):
+            for src in self._collect_python_files(td, "test", env_path):
+                _add(src)
+        for pattern in ("test_*.py", "*_test.py"):
+            for f in env_path.glob(pattern):
+                _add(self._read_file(f, "test", env_path))
 
-        # Also grab any test_*.py or *_test.py in the root
-        for f in env_path.glob("test_*.py"):
-            src = self._read_file(f, "test", env_path)
-            if src:
-                sources.append(src)
-        for f in env_path.glob("*_test.py"):
-            src = self._read_file(f, "test", env_path)
-            if src:
-                sources.append(src)
+        # 9. Config/rubric files (YAML, JSON)
+        for ext in ("*.yaml", "*.yml", "*.json"):
+            for config_file in env_path.glob(ext):
+                _add(self._read_file(config_file, "config", env_path))
 
-        # 5. Extract config/rubric files (YAML, JSON)
-        for config_file in env_path.glob("*.yaml"):
-            src = self._read_file(config_file, "config", env_path)
-            if src:
-                sources.append(src)
-        for config_file in env_path.glob("*.yml"):
-            src = self._read_file(config_file, "config", env_path)
-            if src:
-                sources.append(src)
-        for config_file in env_path.glob("*.json"):
-            src = self._read_file(config_file, "config", env_path)
-            if src:
-                sources.append(src)
+        # 10. Dockerfile — not scanned for code, but noted as context
+        dockerfile = env_path / "Dockerfile"
+        if not dockerfile.exists():
+            dockerfile = server_dir / "Dockerfile" if server_dir.is_dir() else None
+        if dockerfile and dockerfile.exists():
+            _add(self._read_file(dockerfile, "config", env_path))
 
-        # 6. Fallback: if no verifier found, grab all .py files
+        # 11. Fallback: if no verifier found, grab all .py files
         if not any(s.role == "verifier" for s in sources):
             for py_file in sorted(env_path.rglob("*.py")):
                 rel = str(py_file.relative_to(env_path))
-                if not any(s.path == rel for s in sources):
-                    src = self._read_file(py_file, "unknown", env_path)
-                    if src:
-                        sources.append(src)
+                if rel not in seen_paths:
+                    _add(self._read_file(py_file, "unknown", env_path))
 
         return sources
 
     def _read_config(self, env_path: Path) -> dict | None:
         """Try to read the OpenEnv config file."""
-        config_names = ["env.yaml", "openenv.yaml", "env_config.yaml", "environment.yaml"]
+        config_names = [
+            "openenv.yaml", "env.yaml", "env_config.yaml", "environment.yaml",
+        ]
         for name in config_names:
             config_path = env_path / name
             if config_path.exists():
