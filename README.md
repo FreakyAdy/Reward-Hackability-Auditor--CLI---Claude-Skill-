@@ -145,26 +145,29 @@ $ ratctl benchmark benchmarks --format markdown
 `ratctl` operates as a unified dual-engine pipeline:
 
 ```mermaid
-graph LR
-    subgraph INGESTION["1. Ingestion & Detection"]
-        A["Target Directory"] --> B["Multi-Signal Format Detector"]
-        B -->|OpenEnv| C1["OpenEnv Adapter"]
-        B -->|verifiers| C2["Verifiers-Spec Adapter"]
-        B -->|Gymnasium| C3["Gymnasium Adapter"]
-        B -->|Raw Python| C4["Raw Adapter"]
+flowchart LR
+    subgraph INGESTION["1. Ingestion and Detection"]
+        A["Target Directory"] --> B["Format Detector"]
+        B --> C1["OpenEnv Adapter"]
+        B --> C2["Verifiers-Spec Adapter"]
+        B --> C3["Gymnasium Adapter"]
+        B --> C4["Raw Adapter"]
     end
 
     subgraph AUDIT["2. Dual-Mode Audit Pipeline"]
-        C1 & C2 & C3 & C4 --> D["Source File Graph"]
-        D --> E["Static AST Engine<br/>(6 Exploit Detectors)"]
-        D --> F["Dynamic LLM Fuzzer<br/>(Subprocess Sandbox + Hints)"]
+        C1 --> D["Source File Graph"]
+        C2 --> D
+        C3 --> D
+        C4 --> D
+        D --> E["Static AST Engine (6 Detectors)"]
+        D --> F["Dynamic LLM Fuzzer (Subprocess Sandbox)"]
     end
 
-    subgraph SCORING["3. Scoring & Enforcement"]
-        E --> G["Weighted Scoring Engine<br/>(Sigmoid Normalization 0-100)"]
-        F -->|1.5x Dynamic Proof Multiplier| G
-        G --> H["Report Renderers<br/>(Rich / JSON / Markdown)"]
-        G --> I["CI/CD Gate<br/>(--fail-on)"]
+    subgraph SCORING["3. Scoring and Enforcement"]
+        E --> G["Weighted Scoring Engine"]
+        F --> G
+        G --> H["Report Renderers (Rich / JSON / Text)"]
+        G --> I["CI/CD Gate (--fail-on)"]
     end
 ```
 
